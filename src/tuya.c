@@ -1,0 +1,169 @@
+#include "tuya.h"
+#include "log_level.h"
+#include "tuya_cacert.h"
+#include "log.h"
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/sysinfo.h>
+#include <syslog.h>
+
+#define TUYA_ACTION_FILE_PATH "/tmp/tuya_action.log"
+
+enum FileOperationResult {
+    FILE_OPERATION_RESULT_OK,
+    FILE_OPERATION_RESULT_ERROR_OPEN,
+    FILE_OPERATION_RESULT_ERROR_WRITE,
+    FILE_OPERATION_RESULT_ERROR_CLOSE
+};
+
+static const char *FILE_OPERATION_RESULT_MESSAGE[] = {
+    "Sucess.",
+    "Failed to open file.",
+    "Failed to write to file.",
+    "Failed to close file."
+};
+
+void on_connected(tuya_mqtt_context_t *context, void *user_data);
+
+void on_disconnect(tuya_mqtt_context_t *context, void *user_data);
+
+void on_messages(tuya_mqtt_context_t *context, void *user_data, const tuyalink_message_t *msg);
+
+char *parse_log_message_json(char *json_string);
+
+enum FileOperationResult append_message_to_file(char *filepath, char *message);
+
+void syslog_file_operation(enum FileOperationResult result, char *user_data);
+
+int tuya_init(tuya_mqtt_context_t *context, char **args) {
+    log_set_quiet(true);
+    int ret = OPRT_OK;
+
+    ret = tuya_mqtt_init(context, &(const tuya_mqtt_config_t){
+                             .host = "m1.tuyacn.com",
+                             .port = 8883,
+                             .cacert = tuya_cacert_pem,
+                             .cacert_len = sizeof(tuya_cacert_pem),
+                             .device_id = args[1],
+                             .device_secret = args[2],
+                             .keepalive = 100,
+                             .timeout_ms = 2000,
+                             .on_connected = on_connected,
+                             .on_disconnect = on_disconnect,
+                             .on_messages = on_messages
+                         });
+    if (ret != OPRT_OK) {
+        return ret;
+    }
+
+    ret = tuya_mqtt_connect(context);
+
+    return ret;
+}
+
+void on_connected(tuya_mqtt_context_t *context, void *user_data) {
+    syslog(LOG_LEVEL_INFO, "Succesfully connected to Tuya cloud.");
+}
+
+void on_disconnect(tuya_mqtt_context_t *context, void *user_data) {
+    syslog(LOG_LEVEL_CRITICAL, "Lost connection to Tuya cloud.");
+}
+
+void on_messages(tuya_mqtt_context_t *context, void *user_data, const tuyalink_message_t *msg) {
+    switch (msg->type) {
+        case THING_TYPE_ACTION_EXECUTE:
+            char *message = parse_log_message_json(msg->data_string);
+
+            syslog(LOG_LEVEL_DEBUG, "Trying to write to file. Data: %s", message);
+            enum FileOperationResult result = append_message_to_file(TUYA_ACTION_FILE_PATH, message);
+            syslog_file_operation(result, message);
+
+            free(message);
+            break;
+
+        default:
+            break;
+    }
+}
+
+char *create_sysinfo_json() {
+    struct sysinfo info;
+    if (sysinfo(&info) == -1) {
+        goto end;
+    }
+
+    char field_buffer[256];
+    cJSON *packet = cJSON_CreateObject();
+
+    snprintf(field_buffer, sizeof(field_buffer), "%ld", info.uptime);
+    if (cJSON_AddStringToObject(packet, "uptime", field_buffer) == NULL) goto end;
+    snprintf(field_buffer, sizeof(field_buffer), "%ld", info.totalram);
+    if (cJSON_AddStringToObject(packet, "totalram", field_buffer) == NULL) goto end;
+    snprintf(field_buffer, sizeof(field_buffer), "%ld", info.freeram);
+    if (cJSON_AddStringToObject(packet, "freeram", field_buffer) == NULL) goto end;
+
+    cJSON *loads = cJSON_AddArrayToObject(packet, "loads");
+    if (loads == NULL) goto end;
+    for (int i = 0; i < 3; i++) {
+        snprintf(field_buffer, sizeof(field_buffer), "%ld", info.loads[i]);
+        cJSON *load = cJSON_CreateString(field_buffer);
+        if (load == NULL) goto end;
+        cJSON_AddItemToArray(loads, load);
+    }
+
+end:
+    char *json_string = cJSON_Print(packet);
+    cJSON_Delete(packet);
+    cJSON_Minify(json_string);
+    return json_string;
+}
+
+char *parse_log_message_json(char *json_string) {
+    cJSON *json = cJSON_Parse(json_string);
+    cJSON *inputParams_json = cJSON_GetObjectItem(json, "inputParams");
+    cJSON *message_json = cJSON_GetObjectItem(inputParams_json, "message");
+
+    char *message = malloc(strlen(message_json->valuestring) + 1);
+    strcpy(message, message_json->valuestring);
+    cJSON_Delete(json);
+
+    return message;
+}
+
+enum FileOperationResult append_message_to_file(char *filepath, char *message) {
+    FILE *file = fopen(filepath, "a");
+    if (file == NULL) {
+        return FILE_OPERATION_RESULT_ERROR_OPEN;
+    }
+
+    int count = strlen(message);
+    int ret = fwrite(message, sizeof(char), count, file);
+    if (ret != count) {
+        fclose(file);
+        return FILE_OPERATION_RESULT_ERROR_WRITE;
+    }
+    fwrite("\n", sizeof(char), 1, file); // maybe should check for error
+
+    ret = fclose(file);
+    if (ret == EOF) {
+        return FILE_OPERATION_RESULT_ERROR_CLOSE;
+    }
+
+    return FILE_OPERATION_RESULT_OK;
+}
+
+void syslog_file_operation(enum FileOperationResult result, char *user_data) {
+    switch (result) {
+        case FILE_OPERATION_RESULT_OK:
+            syslog(LOG_LEVEL_INFO, "Succesfully written action message to file.");
+            break;
+        case FILE_OPERATION_RESULT_ERROR_CLOSE:
+            syslog(LOG_LEVEL_WARNING, "Failed to close file");
+            break;
+        case FILE_OPERATION_RESULT_ERROR_OPEN:
+        case FILE_OPERATION_RESULT_ERROR_WRITE:
+            syslog(LOG_LEVEL_ERROR, "Could not write action message to file. %s",
+                   FILE_OPERATION_RESULT_MESSAGE[result]);
+            break;
+    }
+}

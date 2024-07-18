@@ -6,3 +6,4 @@
 
 char *create_sysinfo_json();
 int tuya_init(tuya_mqtt_context_t* context, char **args);
+void log_sysinfo(char* json_string);
