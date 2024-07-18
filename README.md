@@ -19,3 +19,8 @@ run-daemon     # runs the executable in daemon mode. <br>
 library        # buils the Tuya library. <br>
 clean          # removes all build files (except library files). <br>
 clean-library  # removes all library build files. <br>
+
+**Logging**
+Actions are logged to /tmp/tuya_action.log. <br>
+Daemon status messages are logged using syslog with the identifier "tuyad". <br>
+Your logging utility may or may not need additional configuration to accept these log messages. <br>
