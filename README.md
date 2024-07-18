@@ -2,10 +2,9 @@
 
 **Quick-start guide:**
 
-1. git clone http://84.15.161.187/ugnsta/daemon
-2. cd daemon
-3. make library
-4. make run-daemon
+1. Clone the repo
+2. run 'make library'
+3. run 'make run-daemon'
 
 Required positional parameters: <br>
 <PRODUCT_ID> <DEVICE_ID> <DEVICE_SECRET>
