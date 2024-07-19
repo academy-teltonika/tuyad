@@ -8,7 +8,9 @@ extern const char args_doc[];
 extern struct argp_option options[];
 
 struct arguments {
-  char *args[3];
+  char *product_id;
+  char *device_id;
+  char *device_secret;
   bool daemonize;
 };
 

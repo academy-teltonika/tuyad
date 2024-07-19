@@ -1,4 +1,7 @@
 #include "tuya.h"
+
+#include <arguments.h>
+
 #include "log_level.h"
 #include "tuya_cacert.h"
 #include "log.h"
@@ -35,7 +38,7 @@ enum FileOperationResult append_message_to_file(char *filepath, char *message);
 
 void syslog_file_operation(enum FileOperationResult result, char *user_data);
 
-int tuya_init(tuya_mqtt_context_t *context, char **args) {
+int tuya_init(tuya_mqtt_context_t *context, struct arguments args) {
     log_set_quiet(true);
     int ret = OPRT_OK;
 
@@ -44,8 +47,8 @@ int tuya_init(tuya_mqtt_context_t *context, char **args) {
                              .port = 8883,
                              .cacert = tuya_cacert_pem,
                              .cacert_len = sizeof(tuya_cacert_pem),
-                             .device_id = args[1],
-                             .device_secret = args[2],
+                             .device_id = args.device_id,
+                             .device_secret = args.device_secret,
                              .keepalive = 100,
                              .timeout_ms = 2000,
                              .on_connected = on_connected,

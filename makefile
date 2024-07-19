@@ -25,12 +25,12 @@ vpath $(EXECUTABLE) $(BUILD_DIR)
 
 CFLAGS := -g -Wall
 CPPFLAGS := $(INC_FLAGS)
-EXEC_TUYA_ARGS := ndcqiihiovexazmo 26233c9f735d8fc3f7sj7d bZCBOQlhPjSmbSiS
 
-test:
-	@echo $(INC_FLAGS)
+#----------------------------------------------------------------------------------
+EXEC_TUYA_ARGS := -p @@@@@@@@@@@@@@ -d @@@@@@@@@@@@@ -s @@@@@@@@@@@@@@@@
+#----------------------------------------------------------------------------------
 
-all: $(BUILD_DIR)/$(EXECUTABLE)
+all: $(BUILD_DIR)/$(EXECUTABLE) library
 
 $(BUILD_DIR)/$(EXECUTABLE): OBJECT_FILES := $(foreach object, $(OBJECTS), $(BUILD_DIR)/$(object))
 $(BUILD_DIR)/$(EXECUTABLE): $(OBJECTS) | $(BUILD_DIR)
@@ -43,10 +43,10 @@ $(BUILD_DIR):
 	@mkdir -p $(BUILD_DIR)
 
 run: all
-	export LD_LIBRARY_PATH=$(shell pwd)/$(LIBS_TUYA_PATH) && ./$(BUILD_DIR)/$(EXECUTABLE) -D $(EXEC_TUYA_ARGS)
+	export LD_LIBRARY_PATH=$(shell pwd)/$(LIBS_TUYA_PATH) && ./$(BUILD_DIR)/$(EXECUTABLE) $(EXEC_TUYA_ARGS)
 
 run-daemon: all
-	export LD_LIBRARY_PATH=$(shell pwd)/$(LIBS_TUYA_PATH) && ./$(BUILD_DIR)/$(EXECUTABLE) $(EXEC_TUYA_ARGS)
+	export LD_LIBRARY_PATH=$(shell pwd)/$(LIBS_TUYA_PATH) && ./$(BUILD_DIR)/$(EXECUTABLE) $(EXEC_TUYA_ARGS) -D
 
 library:
 	-cd $(LIB_TUYA_ROOT) && mkdir build 2>/dev/null
@@ -57,6 +57,5 @@ clean:
 
 clean-library:
 	-rm -r $(LIB_TUYA_ROOT)/build 2>/dev/null
-
 
 .PHONY: all run run-daemon clean library clean-library

@@ -30,9 +30,7 @@ int main(int argc, char **argv) {
 
   // TODO: Print out a success/error message to the console if the daemon started correctly.
   if (arguments.daemonize) {
-    if (daemonize()) {
-      syslog(LOG_LEVEL_INFO, "Tuya daemon started succesfully.");
-    } else {
+    if (!daemonize()) {
       syslog(LOG_LEVEL_ERROR, "Failed to start Tuya daemon.");
       return -1;
     }
@@ -42,10 +40,11 @@ int main(int argc, char **argv) {
   openlog(NULL, SYSLOG_OPTIONS, LOG_LOCAL0);
   atexit(cleanup);
 
-  int ret = tuya_init(&g_context, arguments.args);
-  if (ret != OPRT_OK) {
+  if (tuya_init(&g_context, arguments) != OPRT_OK) {
+    syslog(LOG_LEVEL_ERROR, "Failed to connect to Tuya cloud.");
     return -1;
   }
+  syslog(LOG_LEVEL_INFO, "Tuya daemon started succesfully.");
 
   // Very coarse timer.
   time_t last_time = 0;
@@ -70,6 +69,7 @@ int main(int argc, char **argv) {
 
 void cleanup(void) {
   closelog();
+  tuya_mqtt_disconnect(&g_context); // Possibly redundant. Need to read the documentation.
   tuya_mqtt_deinit(&g_context);
 }
 
