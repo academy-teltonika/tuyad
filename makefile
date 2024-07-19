@@ -30,7 +30,7 @@ CPPFLAGS := $(INC_FLAGS)
 EXEC_TUYA_ARGS := -p @@@@@@@@@@@@@@ -d @@@@@@@@@@@@@ -s @@@@@@@@@@@@@@@@
 #----------------------------------------------------------------------------------
 
-all: $(BUILD_DIR)/$(EXECUTABLE) library
+all: library $(BUILD_DIR)/$(EXECUTABLE)
 
 $(BUILD_DIR)/$(EXECUTABLE): OBJECT_FILES := $(foreach object, $(OBJECTS), $(BUILD_DIR)/$(object))
 $(BUILD_DIR)/$(EXECUTABLE): $(OBJECTS) | $(BUILD_DIR)
