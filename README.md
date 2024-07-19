@@ -8,10 +8,15 @@
 3. run 'make run-daemon'
 
 **Required options**: <br>
--p <PRODUCT_ID> -d <DEVICE_ID> -s <DEVICE_SECRET>
+-p <PRODUCT_ID> <br>
+-d <DEVICE_ID> <br>
+-s <DEVICE_SECRET> <br>
 
 **Optional flags:** <br>
 -D             # runs the application in daemon mode.
+
+**Usage example** <br>
+tuyad -D -p @@@ -d @@@ -s @@@ <br>
 
 **Make targets:** <br>
 all            # creates the daemon executable. <br>
