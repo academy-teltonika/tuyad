@@ -4,8 +4,8 @@
 
 1. Clone the repo
 2. Specify device information in the makefile field "EXEC_TUYA_ARGS"
-2. run 'make library'
-3. run 'make run-daemon'
+3. run 'make library'
+4. run 'make run-daemon'
 
 **Required options**: <br>
 -p <PRODUCT_ID> <br>
