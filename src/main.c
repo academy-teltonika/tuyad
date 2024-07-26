@@ -1,6 +1,8 @@
 #include "tuya.h"
 #include "log_level.h"
 #include "arguments.h"
+#include "ubus_methods.h"
+
 #include <stdlib.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -18,29 +20,27 @@ void termination_handler(int signum);
 
 void cleanup();
 
-bool daemonize();
-
-tuya_mqtt_context_t g_context;
+tuya_mqtt_context_t g_tuya_context;
+struct ubus_context *g_ubus_context;
 bool g_running = true;
 
+// Todo: probably move some stuff into init functions
 int main(int argc, char **argv) {
   struct arguments arguments = arguments_create();
   struct argp argp = {options, parse_opt, args_doc, doc};
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
-  // TODO: Print out a success/error message to the console if the daemon started correctly.
-  if (arguments.daemonize) {
-    if (!daemonize()) {
-      syslog(LOG_LEVEL_ERROR, "Failed to start Tuya daemon.");
-      return -1;
-    }
-  }
-
+  atexit(cleanup);
   configure_signal_handlers();
   openlog(NULL, SYSLOG_OPTIONS, LOG_LOCAL0);
-  atexit(cleanup);
 
-  if (tuya_init(&g_context, arguments) != OPRT_OK) {
+  g_ubus_context = ubus_connect(NULL);
+	if (!g_ubus_context) {
+		syslog(LOG_LEVEL_ERROR, "Failed to connect to ubus\n");
+		return -1;
+	}
+
+  if (tuya_init(&g_tuya_context, arguments) != OPRT_OK) {
     syslog(LOG_LEVEL_ERROR, "Failed to connect to Tuya cloud.");
     return -1;
   }
@@ -50,13 +50,16 @@ int main(int argc, char **argv) {
   time_t last_time = 0;
   time_t delta_time = INT_MAX;
 
+  struct SystemInfo systemInfo = { 0 };
   while (g_running) {
-    tuya_mqtt_loop(&g_context);
+    tuya_mqtt_loop(&g_tuya_context);
 
     if (delta_time >= CLOUD_REPORTING_INTERVAL_SEC) {
       last_time = time(NULL);
-      char *info_json_string = create_sysinfo_json();
-      tuyalink_thing_property_report(&g_context, NULL, info_json_string);
+
+      get_ubus_system_info(&systemInfo, g_ubus_context);
+      char *info_json_string = create_sysinfo_json(&systemInfo);
+      tuyalink_thing_property_report(&g_tuya_context, NULL, info_json_string);
       syslog(LOG_LEVEL_INFO, "%s %s", "Sending sysinfo. JSON:", info_json_string);
       free(info_json_string);
     }
@@ -69,8 +72,10 @@ int main(int argc, char **argv) {
 
 void cleanup(void) {
   closelog();
-  tuya_mqtt_disconnect(&g_context); // Possibly redundant. Need to read the documentation.
-  tuya_mqtt_deinit(&g_context);
+  ubus_free(g_ubus_context);
+  tuya_mqtt_disconnect(&g_tuya_context); // Possibly redundant. Need to read the documentation.
+  tuya_mqtt_deinit(&g_tuya_context);
+  syslog(LOG_LEVEL_INFO, "Shutdown successful.");
 }
 
 void configure_signal_handlers(void) {
@@ -88,42 +93,4 @@ void configure_signal_handlers(void) {
 void termination_handler(int signum) {
   g_running = false;
   syslog(LOG_LEVEL_INFO, "Terminating from signal: %d", signum);
-}
-
-bool daemonize() {
-  switch (fork()) {
-    case 0:
-      break;
-    case -1:
-      return false;
-    default:
-      exit(0);
-  }
-
-  if (setsid() == -1) {
-    return false;
-  }
-
-  switch (fork()) {
-    case 0:
-      break;
-    case -1:
-      return false;
-    default:
-      exit(0);
-  }
-
-  umask(0);
-  chdir("/");
-
-  close(STDIN_FILENO);
-  int fd = open("/dev/null", O_RDWR);
-  if (fd != STDIN_FILENO)
-    return false;
-  if (dup2(STDIN_FILENO, STDOUT_FILENO) != STDOUT_FILENO)
-    return false;
-  if (dup2(STDIN_FILENO, STDERR_FILENO) != STDERR_FILENO)
-    return false;
-
-  return true;
 }

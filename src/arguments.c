@@ -6,7 +6,6 @@ struct argp_option options[] = {
   {"verbose", 'p', "product-id", 0, "Tuya cloud product id."},
   {"verbose", 'd', "device-id", 0, "Tuya cloud device id."},
   {"verbose", 's', "device-secret", 0, "Tuya cloud device secret."},
-  {"verbose", 'D', 0, 0, "Launch as a daemon process"},
   {0}
 };
 
@@ -22,9 +21,6 @@ error_t parse_opt(int key, char *arg, struct argp_state *state) {
       break;
     case 's':
       arguments->device_secret = arg;
-      break;
-    case 'D':
-      arguments->daemonize = true;
       break;
     case ARGP_KEY_ARG:
       argp_error(state, "Use the -d -p -s flags to specify device information.");
@@ -47,7 +43,6 @@ error_t parse_opt(int key, char *arg, struct argp_state *state) {
 
 struct arguments arguments_create(void) {
   struct arguments arguments;
-  arguments.daemonize = false;
   arguments.product_id = NULL;
   arguments.device_id = NULL;
   arguments.device_secret = NULL;

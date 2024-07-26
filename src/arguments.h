@@ -11,7 +11,6 @@ struct arguments {
   char *product_id;
   char *device_id;
   char *device_secret;
-  bool daemonize;
 };
 
 error_t parse_opt(int key, char *arg, struct argp_state *state);

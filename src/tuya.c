@@ -1,14 +1,14 @@
 #include "tuya.h"
 
-#include <arguments.h>
-
 #include "log_level.h"
 #include "tuya_cacert.h"
 #include "log.h"
+
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/sysinfo.h>
 #include <syslog.h>
+#include <arguments.h>
 
 #define TUYA_ACTION_FILE_PATH "/tmp/tuya_action.log"
 
@@ -73,9 +73,11 @@ void on_disconnect(tuya_mqtt_context_t *context, void *user_data) {
 }
 
 void on_messages(tuya_mqtt_context_t *context, void *user_data, const tuyalink_message_t *msg) {
+    char* message;
+
     switch (msg->type) {
         case THING_TYPE_ACTION_EXECUTE:
-            char *message = parse_log_message_json(msg->data_string);
+            message = parse_log_message_json(msg->data_string);
 
             syslog(LOG_LEVEL_DEBUG, "Trying to write to file. Data: %s", message);
             enum FileOperationResult result = append_message_to_file(TUYA_ACTION_FILE_PATH, message);
@@ -89,33 +91,33 @@ void on_messages(tuya_mqtt_context_t *context, void *user_data, const tuyalink_m
     }
 }
 
-char *create_sysinfo_json() {
-    struct sysinfo info;
-    if (sysinfo(&info) == -1) {
-        goto end;
-    }
-
+char *create_sysinfo_json(struct SystemInfo* systemInfo) {
+    char* json_string = NULL;
     char field_buffer[256];
     cJSON *packet = cJSON_CreateObject();
 
-    snprintf(field_buffer, sizeof(field_buffer), "%ld", info.uptime);
+    if (systemInfo == NULL) {
+      goto end;
+    }
+
+    snprintf(field_buffer, sizeof(field_buffer), "%u", systemInfo->uptime);
     if (cJSON_AddStringToObject(packet, "uptime", field_buffer) == NULL) goto end;
-    snprintf(field_buffer, sizeof(field_buffer), "%ld", info.totalram);
+    snprintf(field_buffer, sizeof(field_buffer), "%llu", systemInfo->total);
     if (cJSON_AddStringToObject(packet, "totalram", field_buffer) == NULL) goto end;
-    snprintf(field_buffer, sizeof(field_buffer), "%ld", info.freeram);
+    snprintf(field_buffer, sizeof(field_buffer), "%llu", systemInfo->free);
     if (cJSON_AddStringToObject(packet, "freeram", field_buffer) == NULL) goto end;
 
     cJSON *loads = cJSON_AddArrayToObject(packet, "loads");
     if (loads == NULL) goto end;
     for (int i = 0; i < 3; i++) {
-        snprintf(field_buffer, sizeof(field_buffer), "%ld", info.loads[i]);
+        snprintf(field_buffer, sizeof(field_buffer), "%u", systemInfo->load[i]);
         cJSON *load = cJSON_CreateString(field_buffer);
         if (load == NULL) goto end;
         cJSON_AddItemToArray(loads, load);
     }
 
 end:
-    char *json_string = cJSON_Print(packet);
+    json_string = cJSON_Print(packet);
     cJSON_Delete(packet);
     cJSON_Minify(json_string);
     return json_string;

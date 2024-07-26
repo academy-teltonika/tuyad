@@ -1,19 +1,6 @@
-LIB_TUYA_ROOT = lib/tuya-iot-core-sdk
-LIBS_TUYA_PATH = $(LIB_TUYA_ROOT)/build/lib
-LIBS_TUYA = $(wildcard $(LIBS_TUYA_PATH)/*.so)
-
-LIBS_NAMES = $(notdir $(LIBS_TUYA))
-LIBS_NAMES_ARGS = $(foreach name, $(LIBS_NAMES), $(name:lib%.so=-l%))
-LIBS_PATHS = $(LIBS_TUYA_PATH)
-LIBS_PATHS_ARGS = $(foreach path, $(LIBS_PATHS), -L$(path))
-
-HEADERS := $(dir $(shell find . -name '*.h'))
-HEADERS_CLEAN := $(sort $(HEADERS))
-INC_DIRS = $(foreach header, $(HEADERS_CLEAN), $(header:%/=%))
-INC_FLAGS := $(addprefix -I,$(INC_DIRS))
-
 SRC_DIR = src
 BUILD_DIR = build
+LIBS_NAMES_ARGS = -llink_core -lmiddleware_implementation -lplatform_port -lutils_modules -lubus -lubox -lblobmsg_json
 
 SOURCES := $(shell find $(SRC_DIR) -name '*.c')
 OBJECTS := $(patsubst $(SRC_DIR)/%.c, %.o, $(SOURCES))
@@ -23,18 +10,15 @@ vpath %.o $(BUILD_DIR)
 vpath %.c $(SRC_DIR)
 vpath $(EXECUTABLE) $(BUILD_DIR)
 
-CFLAGS := -g -Wall
-CPPFLAGS := $(INC_FLAGS)
+CFLAGS += -g -Wall
+CPPFLAGS += -I$(SRC_DIR)
+LDFLAGS += $(LIBS_NAMES_ARGS)
 
-#----------------------------------------------------------------------------------
-EXEC_TUYA_ARGS := -p @@@@@@@@@@@@@@ -d @@@@@@@@@@@@@ -s @@@@@@@@@@@@@@@@
-#----------------------------------------------------------------------------------
-
-all: library $(BUILD_DIR)/$(EXECUTABLE)
+all: $(BUILD_DIR)/$(EXECUTABLE)
 
 $(BUILD_DIR)/$(EXECUTABLE): OBJECT_FILES := $(foreach object, $(OBJECTS), $(BUILD_DIR)/$(object))
 $(BUILD_DIR)/$(EXECUTABLE): $(OBJECTS) | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(CPPFLAGS) $(LIBS_PATHS_ARGS) $(OBJECT_FILES) -o $(BUILD_DIR)/$(EXECUTABLE) $(LIBS_NAMES_ARGS)
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(OBJECT_FILES) -o $(BUILD_DIR)/$(EXECUTABLE) $(LDFLAGS)
 
 $(OBJECTS): %.o: %.c | $(BUILD_DIR)
 	$(CC) -c $(CFLAGS) $(CPPFLAGS) $< -o $(BUILD_DIR)/$@
@@ -42,20 +26,8 @@ $(OBJECTS): %.o: %.c | $(BUILD_DIR)
 $(BUILD_DIR):
 	@mkdir -p $(BUILD_DIR)
 
-run: all
-	export LD_LIBRARY_PATH=$(shell pwd)/$(LIBS_TUYA_PATH) && ./$(BUILD_DIR)/$(EXECUTABLE) $(EXEC_TUYA_ARGS)
-
-run-daemon: all
-	export LD_LIBRARY_PATH=$(shell pwd)/$(LIBS_TUYA_PATH) && ./$(BUILD_DIR)/$(EXECUTABLE) $(EXEC_TUYA_ARGS) -D
-
-library:
-	-cd $(LIB_TUYA_ROOT) && mkdir build 2>/dev/null
-	cd $(LIB_TUYA_ROOT)/build && cmake .. && make
-
 clean:
 	-rm -r $(BUILD_DIR) 2>/dev/null
 
-clean-library:
-	-rm -r $(LIB_TUYA_ROOT)/build 2>/dev/null
 
-.PHONY: all run run-daemon clean library clean-library
+.PHONY: all clean
