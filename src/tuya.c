@@ -13,6 +13,7 @@
 #define TUYA_ACTION_FILE_PATH "/tmp/tuya_action.log"
 
 extern struct ubus_context *g_ubus_context;
+tuya_mqtt_context_t g_tuya_context;
 
 enum TuyaAction {
     TUYA_ACTION_LIST_DEVICES,
@@ -33,25 +34,91 @@ static const char *FILE_OPERATION_RESULT_MESSAGE[] = {
     "Failed to close file."
 };
 
-bool parse_tuya_action(char* message_json, enum TuyaAction *action) {
-    enum TuyaAction requested_action = -1;
-    cJSON *json = cJSON_Parse(message_json);
-    cJSON *inputParams_json = cJSON_GetObjectItem(json, "inputParams");
-    cJSON *action_code_json = cJSON_GetObjectItem(inputParams_json, "actionCode");
+bool parse_tuya_action(cJSON *action_json, enum TuyaAction *action) {
+    cJSON *action_code_json = cJSON_GetObjectItem(action_json, "actionCode");
+    if (action_code_json == NULL) {
+        return false;
+    }
 
-
+    enum TuyaAction requested_action;
     if (strcmp(action_code_json->valuestring, "toggle_pin") == 0) {
         requested_action = TUYA_ACTION_PIN_TOGGLE;
     } else if (strcmp(action_code_json->valuestring, "list") == 0) {
+        requested_action = TUYA_ACTION_LIST_DEVICES;
     } else {
         return false;
     }
 
-    cJSON_Delete(json);
     *action = requested_action;
     return true;
 }
 
+bool parse_tuya_action_esp_request(cJSON *action_json, struct EspRequest *esp_request) {
+    cJSON *input_params_json = cJSON_GetObjectItem(action_json, "inputParams");
+    if (input_params_json == NULL) {
+        return false;
+    }
+    cJSON *port_json = cJSON_GetObjectItem(input_params_json, "port");
+    if (port_json != NULL) {
+        esp_request->port = malloc(strlen(port_json->valuestring));
+        if (esp_request->port == NULL) {
+            return false;
+        }
+        strcpy(esp_request->port, port_json->valuestring);
+    }
+
+    cJSON *pin_json = cJSON_GetObjectItem(input_params_json, "pin");
+    if (pin_json != NULL) {
+        esp_request->pin = pin_json->valueint;
+    }
+
+    cJSON *sensor_json = cJSON_GetObjectItem(input_params_json, "sensor");
+    if (sensor_json != NULL) {
+        esp_request->sensor = malloc(strlen(sensor_json->valuestring));
+        if (esp_request->sensor == NULL) {
+            return false;
+        }
+        strcpy(esp_request->sensor, sensor_json->valuestring);
+    }
+
+    cJSON *model_json = cJSON_GetObjectItem(input_params_json, "model");
+    if (model_json != NULL) {
+        esp_request->model = malloc(strlen(model_json->valuestring));
+        if (esp_request->model == NULL) {
+            return false;
+        }
+        strcpy(esp_request->model, model_json->valuestring);
+    }
+
+    return true;
+}
+
+char *create_esp_action_response_json(struct EspResponse response) {
+    char *json_string = NULL;
+    char field_buffer[1024];
+    cJSON *packet = cJSON_CreateObject();
+
+    if (!response.parsed_successfuly) {
+        cJSON_AddStringToObject(packet, "result", "err");
+        cJSON_AddStringToObject(packet, "message", "Failed to parse ubus response.");
+    }
+
+    // TODO NULL checks?
+    snprintf(field_buffer, sizeof(field_buffer), "%s", response.success ? "ok" : "err");
+    if (cJSON_AddStringToObject(packet, "result", field_buffer) == NULL) goto end;
+    snprintf(field_buffer, sizeof(field_buffer), "%s", response.message);
+    if (cJSON_AddStringToObject(packet, "message", field_buffer) == NULL) goto end;
+    snprintf(field_buffer, sizeof(field_buffer), "%s", response.data);
+    if (cJSON_AddStringToObject(packet, "data", field_buffer) == NULL) goto end;
+
+end:
+    json_string = cJSON_Print(packet);
+    cJSON_Delete(packet);
+    cJSON_Minify(json_string);
+    return json_string;
+}
+
+// Todo fix static
 void on_connected(tuya_mqtt_context_t *context, void *user_data);
 
 void on_disconnect(tuya_mqtt_context_t *context, void *user_data);
@@ -64,11 +131,11 @@ enum FileOperationResult append_message_to_file(char *filepath, char *message);
 
 void syslog_file_operation(enum FileOperationResult result, char *user_data);
 
-int tuya_init(tuya_mqtt_context_t *context, struct arguments args) {
+int tuya_init(struct arguments args) {
     log_set_quiet(true);
     int ret = OPRT_OK;
 
-    ret = tuya_mqtt_init(context, &(const tuya_mqtt_config_t){
+    ret = tuya_mqtt_init(&g_tuya_context, &(const tuya_mqtt_config_t){
                              .host = "m1.tuyacn.com",
                              .port = 8883,
                              .cacert = tuya_cacert_pem,
@@ -85,7 +152,7 @@ int tuya_init(tuya_mqtt_context_t *context, struct arguments args) {
         return ret;
     }
 
-    ret = tuya_mqtt_connect(context);
+    ret = tuya_mqtt_connect(&g_tuya_context);
 
     return ret;
 }
@@ -99,20 +166,32 @@ void on_disconnect(tuya_mqtt_context_t *context, void *user_data) {
 }
 
 void on_messages(tuya_mqtt_context_t *context, void *user_data, const tuyalink_message_t *msg) {
-    char* message;
-
     switch (msg->type) {
         case THING_TYPE_ACTION_EXECUTE:
+            // TODO move out
             enum TuyaAction action;
-            parse_tuya_action(msg->data_string, &action);
+            cJSON *action_json = cJSON_Parse(msg->data_string);
+            parse_tuya_action(action_json, &action);
+
+            struct EspRequest esp_request;
+            parse_tuya_action_esp_request(action_json, &esp_request);
+            struct EspResponse esp_response;
+            char *esp_response_json = NULL;
+            cJSON_Delete(action_json);
+
             switch (action) {
                 case TUYA_ACTION_PIN_TOGGLE:
-                    ubus_toggle_esp_pin(0, NULL, g_ubus_context);
+                    ubus_send_toggle_esp_pin_request(g_ubus_context, esp_request, &esp_response);
                     break;
                 default:
                     break;
             }
 
+            esp_response_json = create_esp_action_response_json(esp_response);
+            tuyalink_thing_property_report(&g_tuya_context, NULL, esp_response_json);
+
+            EspRequest_free(&esp_request);
+            free(esp_response_json);
             break;
 
         default:
@@ -120,13 +199,13 @@ void on_messages(tuya_mqtt_context_t *context, void *user_data, const tuyalink_m
     }
 }
 
-char *create_sysinfo_json(struct SystemInfo* systemInfo) {
-    char* json_string = NULL;
+char *create_sysinfo_json(struct SystemInfo *systemInfo) {
+    char *json_string = NULL;
     char field_buffer[256];
     cJSON *packet = cJSON_CreateObject();
 
     if (systemInfo == NULL) {
-      goto end;
+        goto end;
     }
 
     snprintf(field_buffer, sizeof(field_buffer), "%u", systemInfo->uptime);

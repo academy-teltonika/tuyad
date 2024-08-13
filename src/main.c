@@ -1,7 +1,7 @@
 #include "tuya.h"
 #include "log_level.h"
 #include "arguments.h"
-#include "ubus_methods.h"
+#include "ubus.h"
 
 #include <stdlib.h>
 #include <fcntl.h>
@@ -20,8 +20,8 @@ void termination_handler(int signum);
 
 void cleanup();
 
-tuya_mqtt_context_t g_tuya_context;
 struct ubus_context *g_ubus_context;
+extern struct tuya_mqtt_context g_tuya_context;
 bool g_running = true;
 
 // Todo: probably move some stuff into init functions
@@ -35,12 +35,12 @@ int main(int argc, char **argv) {
   openlog(NULL, SYSLOG_OPTIONS, LOG_LOCAL0);
 
   g_ubus_context = ubus_connect(NULL);
-	if (!g_ubus_context) {
-		syslog(LOG_LEVEL_ERROR, "Failed to connect to ubus\n");
-		return -1;
-	}
+  if (g_ubus_context == NULL) {
+    syslog(LOG_LEVEL_ERROR, "Failed to connect to ubus\n");
+    return -1;
+  }
 
-  if (tuya_init(&g_tuya_context, arguments) != OPRT_OK) {
+  if (tuya_init(arguments) != OPRT_OK) {
     syslog(LOG_LEVEL_ERROR, "Failed to connect to Tuya cloud.");
     return -1;
   }
@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
   time_t last_time = 0;
   time_t delta_time = INT_MAX;
 
-  struct SystemInfo systemInfo = { 0 };
+  struct SystemInfo systemInfo = {0};
   while (g_running) {
     tuya_mqtt_loop(&g_tuya_context);
 
