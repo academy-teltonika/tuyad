@@ -18,8 +18,10 @@ enum {
 };
 
 enum {
-	SYSTEM_INFO_UPTIME_VALUE,
-	__SYSTEM_INFO_UPTIME_MAX,
+	ESP_RESPONSE_RESULT,
+	ESP_RESPONSE_MESSAGE,
+	ESP_RESPONSE_DATA,
+	__ESP_RESPONSE_MAX
 };
 
 static const struct blobmsg_policy system_info_policy[__SYSTEM_INFO_MAX] = {
@@ -33,6 +35,24 @@ static const struct blobmsg_policy system_info_memory_policy[__SYSTEM_INFO_MEMOR
 	[SYSTEM_INFO_MEMORY_FREE]  = { .name = "free", .type = BLOBMSG_TYPE_INT64 },
 };
 
+static const struct blobmsg_policy esp_response_policy[__ESP_RESPONSE_MAX] = {
+	[ESP_RESPONSE_RESULT] = {.name = "result", .type = BLOBMSG_TYPE_STRING},
+	[ESP_RESPONSE_MESSAGE] = {.name = "message", .type = BLOBMSG_TYPE_STRING},
+	[ESP_RESPONSE_DATA] = {.name = "data", .type = BLOBMSG_TYPE_STRING},
+};
+
+static void parse_ubus_esp_response(struct ubus_request *req, int type, struct blob_attr *msg) {
+	struct EspResponse *esp_response = (struct EspResponse *)req->priv;
+	struct blob_attr *esp_response_table[__SYSTEM_INFO_MAX];
+
+	blobmsg_parse(esp_response_policy, __ESP_RESPONSE_MAX, esp_response_table, blob_data(msg), blob_len(msg));
+
+	if (esp_response_table[ESP_RESPONSE_RESULT] == NULL) {
+		esp_response->parsed_successfuly = false;
+		return;
+	}
+}
+
 static void parse_ubus_system_info(struct ubus_request *req, int type, struct blob_attr *msg)
 {
 	struct SystemInfo *systemInfo = (struct SystemInfo *)req->priv;
@@ -41,9 +61,9 @@ static void parse_ubus_system_info(struct ubus_request *req, int type, struct bl
 
 	blobmsg_parse(system_info_policy, __SYSTEM_INFO_MAX, system_info, blob_data(msg), blob_len(msg));
 
-	if (!system_info[SYSTEM_INFO_MEMORY] ||
-	    !system_info[SYSTEM_INFO_LOAD] ||
-		!system_info[SYSTEM_INFO_UPTIME]) {
+	if (system_info[SYSTEM_INFO_MEMORY] == NULL ||
+	    system_info[SYSTEM_INFO_LOAD] == NULL ||
+		system_info[SYSTEM_INFO_UPTIME] == NULL) {
 		systemInfo->parsed_successfuly = false;
 		return;
 	}
@@ -70,7 +90,7 @@ static void parse_ubus_system_info(struct ubus_request *req, int type, struct bl
     }
 }
 
-struct SystemInfo* get_ubus_system_info(struct SystemInfo *systemInfo, struct ubus_context *ctx) {
+struct SystemInfo *get_ubus_system_info(struct SystemInfo *systemInfo, struct ubus_context *ctx) {
 	unsigned int id;
 	if (ubus_lookup_id(ctx, "system", &id) ||
 	    ubus_invoke(ctx, id, "info", NULL, parse_ubus_system_info, systemInfo, 3000)) {
@@ -84,4 +104,12 @@ struct SystemInfo* get_ubus_system_info(struct SystemInfo *systemInfo, struct ub
 	}
 
 	return systemInfo;
+}
+
+char* ubus_toggle_esp_pin(int pin, char *port, struct ubus_context *ctx) {
+	unsigned int id;
+	ubus_lookup_id(ctx, "commesp", &id);
+	ubus_invoke(ctx, id, "on", "\"pin\":0, \"port\":\"/dev/ttyUSB0\"", NULL, NULL, 3000);
+
+	return "sent";
 }

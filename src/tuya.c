@@ -12,6 +12,13 @@
 
 #define TUYA_ACTION_FILE_PATH "/tmp/tuya_action.log"
 
+extern struct ubus_context *g_ubus_context;
+
+enum TuyaAction {
+    TUYA_ACTION_LIST_DEVICES,
+    TUYA_ACTION_PIN_TOGGLE,
+};
+
 enum FileOperationResult {
     FILE_OPERATION_RESULT_OK,
     FILE_OPERATION_RESULT_ERROR_OPEN,
@@ -25,6 +32,25 @@ static const char *FILE_OPERATION_RESULT_MESSAGE[] = {
     "Failed to write to file.",
     "Failed to close file."
 };
+
+bool parse_tuya_action(char* message_json, enum TuyaAction *action) {
+    enum TuyaAction requested_action = -1;
+    cJSON *json = cJSON_Parse(message_json);
+    cJSON *inputParams_json = cJSON_GetObjectItem(json, "inputParams");
+    cJSON *action_code_json = cJSON_GetObjectItem(inputParams_json, "actionCode");
+
+
+    if (strcmp(action_code_json->valuestring, "toggle_pin") == 0) {
+        requested_action = TUYA_ACTION_PIN_TOGGLE;
+    } else if (strcmp(action_code_json->valuestring, "list") == 0) {
+    } else {
+        return false;
+    }
+
+    cJSON_Delete(json);
+    *action = requested_action;
+    return true;
+}
 
 void on_connected(tuya_mqtt_context_t *context, void *user_data);
 
@@ -77,13 +103,16 @@ void on_messages(tuya_mqtt_context_t *context, void *user_data, const tuyalink_m
 
     switch (msg->type) {
         case THING_TYPE_ACTION_EXECUTE:
-            message = parse_log_message_json(msg->data_string);
+            enum TuyaAction action;
+            parse_tuya_action(msg->data_string, &action);
+            switch (action) {
+                case TUYA_ACTION_PIN_TOGGLE:
+                    ubus_toggle_esp_pin(0, NULL, g_ubus_context);
+                    break;
+                default:
+                    break;
+            }
 
-            syslog(LOG_LEVEL_DEBUG, "Trying to write to file. Data: %s", message);
-            enum FileOperationResult result = append_message_to_file(TUYA_ACTION_FILE_PATH, message);
-            syslog_file_operation(result, message);
-
-            free(message);
             break;
 
         default:
