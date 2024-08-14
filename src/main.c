@@ -3,6 +3,9 @@
 #include "arguments.h"
 #include "ubus.h"
 
+#include <tuya_error_code.h> // TODO
+#include <tuyalink_core.h> // TODO
+#include "tuya_action_log.h" // TODO
 #include <stdlib.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -20,7 +23,7 @@ void termination_handler(int signum);
 
 void cleanup();
 
-struct ubus_context *g_ubus_context;
+extern struct ubus_context *g_ubus_context;
 extern struct tuya_mqtt_context g_tuya_context;
 bool g_running = true;
 
@@ -57,9 +60,9 @@ int main(int argc, char **argv) {
     if (delta_time >= CLOUD_REPORTING_INTERVAL_SEC) {
       last_time = time(NULL);
 
-      get_ubus_system_info(&systemInfo, g_ubus_context);
+      ubus_get_system_info(&systemInfo, g_ubus_context);
       char *info_json_string = create_sysinfo_json(&systemInfo);
-      tuyalink_thing_property_report(&g_tuya_context, NULL, info_json_string);
+      // tuyalink_thing_property_report(&g_tuya_context, NULL, info_json_string);
       syslog(LOG_LEVEL_INFO, "%s %s", "Sending sysinfo. JSON:", info_json_string);
       free(info_json_string);
     }

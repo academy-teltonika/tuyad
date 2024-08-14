@@ -1,0 +1,8 @@
+#pragma once
+
+enum TuyaAction {
+    TUYA_ACTION_ESP_LIST_DEVICES,
+    TUYA_ACTION_ESP_TOGGLE_PIN,
+    TUYA_ACTION_ESP_READ_SENSOR,
+    TUYA_ACTION_LOG,
+};

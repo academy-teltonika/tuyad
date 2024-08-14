@@ -1,8 +1,11 @@
 #include "ubus.h"
 
 #include "log_level.h"
+#include "tuya_action_log.h"
 #include <syslog.h>
 #include <libubox/blobmsg_json.h>
+
+struct ubus_context *g_ubus_context;
 
 enum {
 	SYSTEM_INFO_MEMORY,
@@ -56,10 +59,14 @@ static void ubus_parse_esp_response(struct ubus_request *req, int type, struct b
 	esp_response->success = strcmp(result, "ok") == 0 ? true : false;
 
 	if (esp_response_table[ESP_RESPONSE_MESSAGE] != NULL) {
-		esp_response->message = blobmsg_get_string(esp_response_table[ESP_RESPONSE_MESSAGE]);
+		char *message = blobmsg_get_string(esp_response_table[ESP_RESPONSE_MESSAGE]);
+		esp_response->message = calloc(strlen(message) + 1, sizeof(char));
+		strcpy(esp_response->message, message);
 	}
 	if (esp_response_table[ESP_RESPONSE_DATA] != NULL) {
-		esp_response->data = blobmsg_get_string(esp_response_table[ESP_RESPONSE_DATA]);
+		char *data = blobmsg_get_string(esp_response_table[ESP_RESPONSE_DATA]);
+		esp_response->data = calloc(strlen(data) + 1, sizeof(char));
+		strcpy(esp_response->data, data);
 	}
 }
 
@@ -99,7 +106,7 @@ static void ubus_parse_system_info(struct ubus_request *req, int type, struct bl
 	}
 }
 
-struct SystemInfo *get_ubus_system_info(struct SystemInfo *systemInfo, struct ubus_context *ctx) {
+struct SystemInfo *ubus_get_system_info(struct SystemInfo *systemInfo, struct ubus_context *ctx) {
 	unsigned int id;
 	if (ubus_lookup_id(ctx, "system", &id) ||
 	    ubus_invoke(ctx, id, "info", NULL, ubus_parse_system_info, systemInfo, 3000)) {
@@ -116,27 +123,51 @@ struct SystemInfo *get_ubus_system_info(struct SystemInfo *systemInfo, struct ub
 }
 
 
-bool ubus_send_toggle_esp_pin_request(struct ubus_context *ctx, struct EspRequest request,
-                                      struct EspResponse *response) {
+bool ubus_invoke_toggle_esp_pin(struct EspRequest request, struct EspResponse *response) {
 	unsigned int id;
-	if (ubus_lookup_id(ctx, "commesp", &id) != 0) {
+	if (ubus_lookup_id(g_ubus_context, "commesp", &id) != 0) {
 		return false; // TODO
 	}
 
 	struct blob_buf ubus_message = {};
 	blob_buf_init(&ubus_message, 0);
 	esp_create_ubus_request_blobmsg(&ubus_message, ESP_ACTION_TOGGLE_PIN, request);
-
-	if (ubus_invoke(ctx, // TODO ugly
+	if (ubus_invoke(g_ubus_context, // TODO ugly
 	                id,
 	                request.pin_power ? "on" : "off",
 	                ubus_message.head,
 	                ubus_parse_esp_response,
 	                response,
 	                3000) != 0) {
-		return false; // TODO
+		return false; // TODO leak
 	}
+
 	blob_buf_free(&ubus_message);
 
 	return true; // TODO
+}
+
+// TODO
+// Implementuot toggle_pin error'us
+// Implementuot list_devices (šlykštus)
+// Implementuot list_devices error'us
+// Sutvarkyt UBUS error'us tuya action'e
+// Sutvarkyt main'ą
+// Ubus init ir deinit
+
+bool ubus_invoke_list_devices(void) {
+	unsigned int id;
+	if (ubus_lookup_id(g_ubus_context, "commesp", &id) != 0) {
+		return false;
+	}
+
+	return true;
+}
+
+bool ubus_init() {
+	// TODO
+}
+
+void ubus_deinit() {
+	// TODO
 }

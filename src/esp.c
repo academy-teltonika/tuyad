@@ -1,13 +1,19 @@
 #include "esp.h"
-#include <stdlib.h>
-#include <libubus.h>
 
-void EspRequest_init(struct EspRequest *request) {
-	request->pin = -1;
-	request->port = NULL;
-	request->pin_power = false;
-	request->sensor = NULL;
-	request->model = NULL;
+#include <stdlib.h>
+#include <libubox/blobmsg_json.h>
+
+#include "tuya_action.h"
+
+struct EspRequest EspRequest_new(enum EspAction action) {
+	struct EspRequest request;
+	request.pin = -1;
+	request.port = NULL;
+	request.pin_power = false;
+	request.sensor = NULL;
+	request.model = NULL;
+	request.tag = action;
+	return request;
 }
 
 void EspRequest_free(struct EspRequest *request) {
@@ -15,13 +21,15 @@ void EspRequest_free(struct EspRequest *request) {
 		free(request->port);
 		request->port = NULL;
 	}
-	if (request->sensor != NULL) {
-		free(request->sensor);
-		request->sensor = NULL;
-	}
-	if (request->model != NULL) {
-		free(request->model);
-		request->model = NULL;
+	if (request->tag == ESP_ACTION_READ_SENSOR) {
+		if (request->sensor != NULL) {
+			free(request->sensor);
+			request->sensor = NULL;
+		}
+		if (request->model != NULL) {
+			free(request->model);
+			request->model = NULL;
+		}
 	}
 }
 
