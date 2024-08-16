@@ -1,30 +1,30 @@
-# OpenWRT Tuya cloud communication daemon
+# OpenWRT Tuya cloud communication and esp controller daemon [WIP]
 
-## **Quick-start guide**
+## Quick-start guide
 
-1. Clone the repo
-2. Put your device details in _**tuya-daemon/files/tuyad.config**_
-3. Compile the package using OpenWRT
-4. Install the .ipk file into the router using OPKG
+1. Install ubus and esp-controller
+2. Install this application using "cmake . && make"
+2. Start ubusd and run the esp-controller
+3. Start this application with the correct tuya credentials (-p <PRODUCT_ID> -d <DEVICE_ID> -s <DEVICE_SECRET)
+4. Send commands using Tuya actions and observe the results
 
-### **Make targets** <br>
+## Tuya action codes
 
-all            _# creates the daemon executable._ <br>
-clean          _# removes all build files (except library files)._ <br>
+list_devices (does not require any arguments) <br>
+toggle_pin (required arguments): <br>
 
-### **Logging** <br>
+1. port: string
+2. pin: integer
+3. power: enum <"on"|"off">
 
-Action messages are logged to /tmp/tuya_action.log <br>
-Daemon status messages are logged using syslog with the identifier "tuyad". <br>
-Your logging utility may or may not need additional configuration to accept these log messages. <br>
+# TODO
 
-### **Daemon mode** <br>
+1. Implement graceful ubus failure handling. Right now the application only support graceful failure when the _commesp_
+   module is down.
 
-The application fully relies on **procd** to run it as a background process.
+2. Create OpenWRT packages and install the application into the router.
+   :w
+3.
+3. Restore "write to log" Tuya action functionality.
 
-If for any reason you need to run the application directly (without procd),
-you must specify the following required options<br>
-
--p PRODUCT_ID <br>
--d DEVICE_ID <br>
--s DEVICE_SECRET <br>
+4. Finish implementing the Tuya action for reading sensor data (80% done, but ran out of time).
