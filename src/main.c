@@ -5,7 +5,6 @@
 
 #include <tuya_error_code.h> // TODO
 #include <tuyalink_core.h> // TODO
-#include "tuya_action_log.h" // TODO
 #include <stdlib.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -21,7 +20,7 @@ void configure_signal_handlers(void);
 
 void termination_handler(int signum);
 
-void cleanup();
+void cleanup(void);
 
 extern struct ubus_context *g_ubus_context;
 extern struct tuya_mqtt_context g_tuya_context;
@@ -37,37 +36,20 @@ int main(int argc, char **argv) {
   configure_signal_handlers();
   openlog(NULL, SYSLOG_OPTIONS, LOG_LOCAL0);
 
-  g_ubus_context = ubus_connect(NULL);
-  if (g_ubus_context == NULL) {
+  if (!ubus_init()) {
     syslog(LOG_LEVEL_ERROR, "Failed to connect to ubus\n");
     return -1;
   }
-
   if (tuya_init(arguments) != OPRT_OK) {
     syslog(LOG_LEVEL_ERROR, "Failed to connect to Tuya cloud.");
     return -1;
   }
+
   syslog(LOG_LEVEL_INFO, "Tuya daemon started succesfully.");
 
-  // Very coarse timer.
-  time_t last_time = 0;
-  time_t delta_time = INT_MAX;
-
-  struct SystemInfo systemInfo = {0};
+  // System info logging functionality was removed.
   while (g_running) {
     tuya_mqtt_loop(&g_tuya_context);
-
-    if (delta_time >= CLOUD_REPORTING_INTERVAL_SEC) {
-      last_time = time(NULL);
-
-      ubus_get_system_info(&systemInfo, g_ubus_context);
-      char *info_json_string = create_sysinfo_json(&systemInfo);
-      // tuyalink_thing_property_report(&g_tuya_context, NULL, info_json_string);
-      syslog(LOG_LEVEL_INFO, "%s %s", "Sending sysinfo. JSON:", info_json_string);
-      free(info_json_string);
-    }
-
-    delta_time = time(NULL) - last_time;
   }
 
   return 0;
@@ -75,9 +57,9 @@ int main(int argc, char **argv) {
 
 void cleanup(void) {
   closelog();
-  ubus_free(g_ubus_context);
-  tuya_mqtt_disconnect(&g_tuya_context); // Possibly redundant. Need to read the documentation.
+  //tuya_mqtt_disconnect(&g_tuya_context); // Possibly redundant. Need to read the documentation.
   tuya_mqtt_deinit(&g_tuya_context);
+  ubus_deinit();
   syslog(LOG_LEVEL_INFO, "Shutdown successful.");
 }
 

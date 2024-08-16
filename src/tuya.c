@@ -1,5 +1,4 @@
 #include "tuya.h"
-#include "esp.h"
 #include "tuya_action_esp.h"
 
 #include "arguments.h"
@@ -7,6 +6,7 @@
 #include <tuyalink_core.h>
 #include <tuya_cacert.h>
 #include <log.h>
+#include <stdlib.h>
 #include <tuya_error_code.h>
 
 #include <syslog.h>
@@ -18,6 +18,7 @@ extern struct ubus_context *g_ubus_context;
 tuya_mqtt_context_t g_tuya_context;
 
 
+// Use a hash-set if there are many action codes
 bool parse_tuya_action_type(cJSON *action_json, enum TuyaAction *action) {
     cJSON *action_code_json = cJSON_GetObjectItem(action_json, "actionCode");
     if (action_code_json == NULL) {
@@ -36,7 +37,7 @@ bool parse_tuya_action_type(cJSON *action_json, enum TuyaAction *action) {
         *action = TUYA_ACTION_ESP_TOGGLE_PIN;
         return true;
     }
-    if (strcmp(action_code_json->valuestring, "list") == 0) {
+    if (strcmp(action_code_json->valuestring, "list_devices") == 0) {
         *action = TUYA_ACTION_ESP_LIST_DEVICES;
         return true;
     }
@@ -49,20 +50,23 @@ static void execute_tuya_action(struct tuya_mqtt_context *context, const tuyalin
     enum TuyaAction tuya_action;
     cJSON *action_json = cJSON_Parse(msg->data_string);
     parse_tuya_action_type(action_json, &tuya_action);
+    char *response_json_string = NULL;
 
     switch (tuya_action) {
         case TUYA_ACTION_ESP_TOGGLE_PIN:
         case TUYA_ACTION_ESP_READ_SENSOR:
-            char *esp_action_response_json_string = NULL;
-            execute_esp_action(EspAction_from_TuyaAction(tuya_action), action_json, &esp_action_response_json_string);
-            tuyalink_thing_property_report(&g_tuya_context, NULL, esp_action_response_json_string);
-            free(esp_action_response_json_string);
+            execute_commesp_esp_action(EspAction_from_TuyaAction(tuya_action), action_json, &response_json_string);
             break;
         case TUYA_ACTION_ESP_LIST_DEVICES:
+            execute_commesp_list_devices(&response_json_string);
             break;
         case TUYA_ACTION_LOG:
             break;
     }
+
+    tuyalink_thing_property_report(&g_tuya_context, NULL, response_json_string);
+    cJSON_Delete(action_json);
+    free(response_json_string);
 }
 
 static void on_messages(tuya_mqtt_context_t *context, void *user_data, const tuyalink_message_t *msg) {
