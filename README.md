@@ -23,8 +23,7 @@ toggle_pin (required arguments): <br>
    module is down.
 
 2. Create OpenWRT packages and install the application into the router.
-   :w
-3.
+
 3. Restore "write to log" Tuya action functionality.
 
 4. Finish implementing the Tuya action for reading sensor data (80% done, but ran out of time).
