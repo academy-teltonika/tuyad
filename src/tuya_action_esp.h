@@ -25,12 +25,21 @@ struct EspRequest {
 	};
 };
 
+struct DHTSensorReading {
+	float temperature;
+	float humidity;
+};
+
 struct EspResponse {
 	bool success;
 	char *message;
-	char *data;
+	enum EspAction tag;
+	union {
+		struct DHTSensorReading *sensor_reading;
+	};
 	bool parsed_successfuly;
 };
+
 
 struct EspDevice {
 	char *port;
@@ -47,7 +56,7 @@ struct EspRequest EspRequest_new(enum EspAction action);
 
 void EspRequest_free(struct EspRequest *request);
 
-struct EspResponse EspResponse_new(void);
+struct EspResponse EspResponse_new(enum EspAction action);
 
 void EspResponse_free(struct EspResponse *response);
 

@@ -3,6 +3,7 @@
 
 #include "arguments.h"
 
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 #include <tuyalink_core.h>
@@ -49,7 +50,7 @@ static bool ParseTuyaActionResult_to_tuya_response_json_string(
   }
 
   *response_json_string = calloc(1024, sizeof(char));
-  char *format_buf;
+  char format_buf[1024];
   switch (action_result) {
   case PARSE_TUYA_ACTION_RESULT_ERR_MALFORMED_JSON:
     snprintf(*response_json_string, 1024, PARSE_TUYA_ACTION_ERROR_FORMAT,
@@ -57,15 +58,13 @@ static bool ParseTuyaActionResult_to_tuya_response_json_string(
                  [PARSE_TUYA_ACTION_RESULT_ERR_MALFORMED_JSON]);
     return false;
   case PARSE_TUYA_ACTION_RESULT_ERR_METHOD_DOES_NOT_EXIST:
-    format_buf = calloc(1024, sizeof(char));
     snprintf(format_buf, 1024, PARSE_TUYA_ACTION_ERROR_FORMAT,
              ParseTuyaActionResult_message
                  [PARSE_TUYA_ACTION_RESULT_ERR_METHOD_DOES_NOT_EXIST]);
     snprintf(*response_json_string, 1024, format_buf, result.field);
-    free(format_buf);
     return false;
   default:
-    abort(); // should never happen.
+    assert(false); // should never happen.
   }
 
   return true;

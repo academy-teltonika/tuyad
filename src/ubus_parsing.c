@@ -2,6 +2,8 @@
 
 #include "tuya_action_esp.h"
 #include "tuya_action_log.h"
+#include <assert.h>
+#include <libubox/blobmsg.h>
 
 enum {
 	SYSTEM_INFO_MEMORY,
@@ -21,6 +23,12 @@ enum {
 	ESP_RESPONSE_MESSAGE,
 	ESP_RESPONSE_DATA,
 	__ESP_RESPONSE_MAX
+};
+
+enum {
+	ESP_RESPONSE_SENSOR_TEMPERATURE,
+	ESP_RESPONSE_SENSOR_HUMIDITY,
+	__ESP_RESPONSE_SENSOR_MAX
 };
 
 enum {
@@ -49,7 +57,12 @@ static const struct blobmsg_policy system_info_memory_policy[__SYSTEM_INFO_MEMOR
 static const struct blobmsg_policy esp_action_response_policy[__ESP_RESPONSE_MAX] = {
 	[ESP_RESPONSE_RESULT] = {.name = "result", .type = BLOBMSG_TYPE_STRING},
 	[ESP_RESPONSE_MESSAGE] = {.name = "message", .type = BLOBMSG_TYPE_STRING},
-	[ESP_RESPONSE_DATA] = {.name = "data", .type = BLOBMSG_TYPE_STRING},
+	[ESP_RESPONSE_DATA] = {.name = "data", .type = BLOBMSG_TYPE_TABLE},
+};
+
+static const struct blobmsg_policy esp_action_response_sensor_data_policy[__ESP_RESPONSE_SENSOR_MAX] = {
+	[ESP_RESPONSE_SENSOR_TEMPERATURE] = {.name = "temperature", BLOBMSG_TYPE_DOUBLE},
+	[ESP_RESPONSE_SENSOR_HUMIDITY] = {.name = "humidity", BLOBMSG_TYPE_DOUBLE},
 };
 
 static const struct blobmsg_policy commesp_policy[__COMMESP_MAX] = {
@@ -64,7 +77,7 @@ static const struct blobmsg_policy commesp_device_properties_policy[__COMMESP_DE
 
 void ubus_parse_commesp_esp_action_response(struct ubus_request *req, int type, struct blob_attr *msg) {
 	struct EspResponse *esp_response = (struct EspResponse *) req->priv;
-	struct blob_attr *esp_response_table[__SYSTEM_INFO_MAX];
+	struct blob_attr *esp_response_table[__ESP_RESPONSE_MAX];
 
 	blobmsg_parse(esp_action_response_policy, __ESP_RESPONSE_MAX, esp_response_table, blob_data(msg), blob_len(msg));
 
@@ -81,11 +94,37 @@ void ubus_parse_commesp_esp_action_response(struct ubus_request *req, int type, 
 		esp_response->message = calloc(strlen(message) + 1, sizeof(char));
 		strcpy(esp_response->message, message);
 	}
-	if (esp_response_table[ESP_RESPONSE_DATA] != NULL) {
-		char *data = blobmsg_get_string(esp_response_table[ESP_RESPONSE_DATA]);
-		esp_response->data = calloc(strlen(data) + 1, sizeof(char));
-		strcpy(esp_response->data, data);
-	}
+
+	// TODO move out into function.
+  struct blob_attr *dht_table[__ESP_RESPONSE_SENSOR_MAX];
+	switch (esp_response->tag) {
+		case ESP_ACTION_TOGGLE_PIN:
+			assert(esp_response_table[ESP_RESPONSE_DATA] == NULL); // Toggle pin must not return any data - if it does - something's wrong.
+		case ESP_ACTION_READ_SENSOR:
+			if (esp_response_table[ESP_RESPONSE_DATA] == NULL) {
+				if (esp_response->success == true) { // TODO: MAKE ESPCOMMD RETURN ERR ON DHT RETURNED NO DATA!!!!!!!!!! (not yet implemented)
+					esp_response->parsed_successfuly = false;
+				}
+				break;
+			}
+			blobmsg_parse(
+      	esp_action_response_sensor_data_policy,
+      	__ESP_RESPONSE_SENSOR_MAX,
+      	dht_table,
+      	blobmsg_data(esp_response_table[ESP_RESPONSE_DATA]),
+      	blobmsg_data_len(esp_response_table[ESP_RESPONSE_DATA])
+      );
+			if (
+				dht_table[ESP_RESPONSE_SENSOR_TEMPERATURE] != NULL &&
+				dht_table[ESP_RESPONSE_SENSOR_HUMIDITY] != NULL) {
+					esp_response->sensor_reading->temperature = blobmsg_get_double(dht_table[ESP_RESPONSE_SENSOR_TEMPERATURE]);
+					esp_response->sensor_reading->humidity = blobmsg_get_double(dht_table[ESP_RESPONSE_SENSOR_HUMIDITY]);
+				} else {
+					esp_response->parsed_successfuly = false;
+				}
+			
+			break;
+		}
 }
 
 void ubus_parse_commesp_devices(struct ubus_request *req, int type, struct blob_attr *msg) {

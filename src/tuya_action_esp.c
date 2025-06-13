@@ -60,28 +60,40 @@ bool parse_esp_request_from_tuya_action_json(cJSON *action_json,
   return true;
 }
 
+// TODO: this can potentioly fail - add error handling.
 char *EspResponse_to_json_string(struct EspResponse response) {
-	char *json_string = NULL;
-	char field_buffer[1024];
-	cJSON *packet = cJSON_CreateObject();
+  char *json_string = NULL;
+  char field_buffer[1024];
+  cJSON *packet = cJSON_CreateObject();
 
-	if (!response.parsed_successfuly) {
-		cJSON_AddStringToObject(packet, "result", "err");
-		cJSON_AddStringToObject(packet, "message", "Ubus parsing error.");
-		goto end;
-	}
+  if (!response.parsed_successfuly) {
+    cJSON_AddStringToObject(packet, "result", "err");
+    cJSON_AddStringToObject(packet, "message", "Ubus parsing error.");
+    goto end;
+  }
 
-	snprintf(field_buffer, sizeof(field_buffer), "%s", response.success ? "ok" : "err");
-	if (cJSON_AddStringToObject(packet, "result", field_buffer) == NULL) goto end;
-	if (response.message != NULL) {
-		snprintf(field_buffer, sizeof(field_buffer), "%s", response.message);
-		if (cJSON_AddStringToObject(packet, "message", field_buffer) == NULL) goto end;
-	}
-	if (response.data != NULL) {
-		snprintf(field_buffer, sizeof(field_buffer), "%s", response.data);
-		if (cJSON_AddStringToObject(packet, "data", field_buffer) == NULL) goto end;
-	}
-
+  snprintf(field_buffer, sizeof(field_buffer), "%s",
+           response.success ? "ok" : "err");
+  if (cJSON_AddStringToObject(packet, "result", field_buffer) == NULL)
+    goto end;
+  if (response.message != NULL) {
+    snprintf(field_buffer, sizeof(field_buffer), "%s", response.message);
+    if (cJSON_AddStringToObject(packet, "message", field_buffer) == NULL)
+      goto end;
+  }
+  switch (response.tag) {
+  case ESP_ACTION_READ_SENSOR: {
+    struct DHTSensorReading *reading = response.sensor_reading;
+    snprintf(field_buffer, sizeof(field_buffer), "%f", reading->temperature);
+    if (cJSON_AddStringToObject(packet, "temperature", field_buffer) == NULL)
+      goto end;
+    snprintf(field_buffer, sizeof(field_buffer), "%f", reading->humidity);
+    if (cJSON_AddStringToObject(packet, "humidity", field_buffer) == NULL)
+      goto end;
+    }
+    default:
+    break;
+    }
 
 end:
 	json_string = cJSON_Print(packet);
@@ -135,35 +147,41 @@ end:
 void execute_commesp_esp_pin_action(enum EspAction action,
                                     cJSON *tuya_action_json,
                                     char **esp_action_response_json_string) {
+	bool success = true;
+	
   struct EspRequest esp_request = EspRequest_new(action);
   parse_esp_request_from_tuya_action_json(tuya_action_json,
                                           &esp_request); // TODO parse checking
-  struct EspResponse esp_response = EspResponse_new();
+  struct EspResponse esp_response = EspResponse_new(action);
 
   switch (action) {
   case ESP_ACTION_TOGGLE_PIN:
     if (!ubus_invoke_esp_toggle_pin(&esp_request, &esp_response)) {
-      goto ubus_error;
+    	success = false;
     }
     break;
   case ESP_ACTION_READ_SENSOR:
+  	esp_response.sensor_reading = malloc(sizeof(struct DHTSensorReading));
     if (!ubus_invoke_esp_read_sensor(&esp_request, &esp_response)) {
-      goto ubus_error;
+    	success = false;
     }
     break;
   default:
-    goto end;
+  break;
   }
 
-ubus_error:
-  *esp_action_response_json_string =
-      malloc(strlen(UBUS_FAILURE_ERROR_MESSAGE) + 1);
-  if (*esp_action_response_json_string == NULL) {
-    goto end;
+  if (success) {
+  		*esp_action_response_json_string = EspResponse_to_json_string(esp_response);
+  } else {
+    *esp_action_response_json_string =
+        malloc(strlen(UBUS_FAILURE_ERROR_MESSAGE) + 1);
+    if (*esp_action_response_json_string == NULL) {
+      goto cleanup;
+    }
+    strcpy(*esp_action_response_json_string, UBUS_FAILURE_ERROR_MESSAGE);
   }
-  strcpy(*esp_action_response_json_string, UBUS_FAILURE_ERROR_MESSAGE);
-end:
-	*esp_action_response_json_string = EspResponse_to_json_string(esp_response);
+
+cleanup:
 	EspRequest_free(&esp_request);
 	EspResponse_free(&esp_response);
 }
@@ -221,20 +239,26 @@ void EspRequest_free(struct EspRequest *request) {
 	}
 }
 
-struct EspResponse EspResponse_new(void) {
-	struct EspResponse response = {.success = false, .parsed_successfuly = true, .message = NULL, .data = NULL};
+struct EspResponse EspResponse_new(enum EspAction action) {
+	struct EspResponse response = {.success = false, .parsed_successfuly = true, .message = NULL, .sensor_reading = NULL, .tag = action};
 	return response;
 }
 
 void EspResponse_free(struct EspResponse *response) {
-	if (response->data != NULL) {
-		free(response->data);
-		response->data = NULL;
-	}
-	if (response->message != NULL) {
-		free(response->message);
-		response->message = NULL;
-	}
+  switch (response->tag) {
+  case ESP_ACTION_READ_SENSOR:
+  if (response->sensor_reading != NULL) {
+    free(response->sensor_reading);
+    response->sensor_reading = NULL;
+  }
+    break;
+  default:
+    break;
+  }
+  if (response->message != NULL) {
+    free(response->message);
+    response->message = NULL;
+  }
 }
 
 struct EspDevices EspDevices_new(void) {
