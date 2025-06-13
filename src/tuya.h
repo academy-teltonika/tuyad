@@ -9,4 +9,5 @@ enum TuyaAction {
     TUYA_ACTION_LOG,
 };
 
-int tuya_init(struct arguments args);
+int
+tuya_init(struct arguments args);

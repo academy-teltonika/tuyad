@@ -13,6 +13,8 @@ struct arguments {
   char *device_secret;
 };
 
-error_t parse_opt(int key, char *arg, struct argp_state *state);
+error_t
+parse_opt(int key, char *arg, struct argp_state *state);
 
-struct arguments arguments_create(void);
+struct arguments
+arguments_create(void);

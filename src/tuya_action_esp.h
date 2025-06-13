@@ -51,7 +51,7 @@ struct EspResponse EspResponse_new(void);
 
 void EspResponse_free(struct EspResponse *response);
 
-void execute_commesp_esp_action(enum EspAction action, cJSON *tuya_action_json, char **esp_action_response_json_string);
+void execute_commesp_esp_pin_action(enum EspAction action, cJSON *tuya_action_json, char **esp_action_response_json_string);
 
 void execute_commesp_list_devices(char **commesp_resposne_json);
 

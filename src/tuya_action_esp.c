@@ -9,10 +9,14 @@
 #define UBUS_PARSE_RESPONSE_ERROR_MESSAGE "{\"result\":\"err\", \"message\":\"Failed to parse ubus response.\"}"
 #define UBUS_FAILURE_ERROR_MESSAGE "{\"result\":\"err\", \"message\":\"Ubus failure.\"}"
 
-bool parse_esp_request_from_tuya_action_json(cJSON *action_json, struct EspRequest *esp_request) {
-	cJSON *input_params_json = cJSON_GetObjectItem(action_json, "inputParams");
-	if (input_params_json == NULL) {
-		return false;
+bool
+parse_esp_request_from_tuya_action_json(
+cJSON *action_json,
+    struct EspRequest *esp_request
+) {
+    cJSON *input_params_json = cJSON_GetObjectItem(action_json, "inputParams");
+    if (input_params_json == NULL) {
+    return false;
 	}
 	cJSON *port_json = cJSON_GetObjectItem(input_params_json, "port");
 	if (port_json != NULL) {
@@ -126,7 +130,7 @@ end:
 	return json_string;
 }
 
-void execute_commesp_esp_action(enum EspAction action, cJSON *tuya_action_json,
+void execute_commesp_esp_pin_action(enum EspAction action, cJSON *tuya_action_json,
                                 char **esp_action_response_json_string) {
 	struct EspRequest esp_request = EspRequest_new(action);
 	parse_esp_request_from_tuya_action_json(tuya_action_json, &esp_request);
@@ -140,6 +144,9 @@ void execute_commesp_esp_action(enum EspAction action, cJSON *tuya_action_json,
 				strcpy(*esp_action_response_json_string, UBUS_FAILURE_ERROR_MESSAGE);
 				goto end;
 			}
+			break;
+		case ESP_ACTION_READ_SENSOR:
+			printf("READ_SENSOR");
 			break;
 		default:
 			break;

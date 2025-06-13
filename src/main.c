@@ -1,25 +1,22 @@
-#include "tuya.h"
-#include "log_level.h"
 #include "arguments.h"
+#include "log_level.h"
+#include "tuya.h"
 #include "ubus.h"
-
-#include <tuya_error_code.h> // TODO
-#include <tuyalink_core.h> // TODO
-#include <stdlib.h>
 #include <fcntl.h>
+#include <signal.h>
+#include <stdlib.h>
 #include <sys/stat.h>
 #include <syslog.h>
-#include <signal.h>
 #include <time.h>
+#include <tuya_error_code.h> // TODO
+#include <tuyalink_core.h>   // TODO
 #include <unistd.h>
 
 #define SYSLOG_OPTIONS LOG_PID | LOG_NDELAY
 #define CLOUD_REPORTING_INTERVAL_SEC 5
 
 void configure_signal_handlers(void);
-
 void termination_handler(int signum);
-
 void cleanup(void);
 
 extern struct ubus_context *g_ubus_context;
@@ -40,6 +37,7 @@ int main(int argc, char **argv) {
     syslog(LOG_LEVEL_ERROR, "Failed to connect to ubus\n");
     return -1;
   }
+
   if (tuya_init(arguments) != OPRT_OK) {
     syslog(LOG_LEVEL_ERROR, "Failed to connect to Tuya cloud.");
     return -1;
@@ -57,7 +55,8 @@ int main(int argc, char **argv) {
 
 void cleanup(void) {
   closelog();
-  //tuya_mqtt_disconnect(&g_tuya_context); // Possibly redundant. Need to read the documentation.
+  // tuya_mqtt_disconnect(&g_tuya_context); // Possibly redundant. Need to read
+  // the documentation.
   tuya_mqtt_deinit(&g_tuya_context);
   ubus_deinit();
   syslog(LOG_LEVEL_INFO, "Shutdown successful.");
