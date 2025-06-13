@@ -9,53 +9,55 @@
 #define UBUS_PARSE_RESPONSE_ERROR_MESSAGE "{\"result\":\"err\", \"message\":\"Failed to parse ubus response.\"}"
 #define UBUS_FAILURE_ERROR_MESSAGE "{\"result\":\"err\", \"message\":\"Ubus failure.\"}"
 
-bool
-parse_esp_request_from_tuya_action_json(
-cJSON *action_json,
-    struct EspRequest *esp_request
-) {
-    cJSON *input_params_json = cJSON_GetObjectItem(action_json, "inputParams");
-    if (input_params_json == NULL) {
+bool parse_esp_request_from_tuya_action_json(cJSON *action_json,
+                                             struct EspRequest *esp_request) {
+  cJSON *input_params_json = cJSON_GetObjectItem(action_json, "inputParams");
+  if (input_params_json == NULL) {
     return false;
-	}
-	cJSON *port_json = cJSON_GetObjectItem(input_params_json, "port");
-	if (port_json != NULL) {
-		esp_request->port = calloc(strlen(port_json->valuestring) + 1, sizeof(char));
-		if (esp_request->port == NULL) {
-			return false;
-		}
-		strcpy(esp_request->port, port_json->valuestring);
-	}
+  }
 
-	cJSON *pin_json = cJSON_GetObjectItem(input_params_json, "pin");
-	if (pin_json != NULL) {
-		esp_request->pin = pin_json->valueint;
-	}
+  cJSON *port_json = cJSON_GetObjectItem(input_params_json, "port");
+  if (port_json != NULL) {
+    esp_request->port =
+        calloc(strlen(port_json->valuestring) + 1, sizeof(char));
+    if (esp_request->port == NULL) {
+      return false;
+    }
+    strcpy(esp_request->port, port_json->valuestring);
+  }
 
-	cJSON *pin_power_json = cJSON_GetObjectItem(input_params_json, "power");
-	if (pin_power_json != NULL) {
-		esp_request->pin_power = strcmp(pin_power_json->valuestring, "on") == 0 ? true : false;
-	}
+  cJSON *pin_json = cJSON_GetObjectItem(input_params_json, "pin");
+  if (pin_json != NULL) {
+    esp_request->pin = pin_json->valueint;
+  }
 
-	cJSON *sensor_json = cJSON_GetObjectItem(input_params_json, "sensor");
-	if (sensor_json != NULL) {
-		esp_request->sensor = calloc(strlen(sensor_json->valuestring) + 1, sizeof(char));
-		if (esp_request->sensor == NULL) {
-			return false;
-		}
-		strcpy(esp_request->sensor, sensor_json->valuestring);
-	}
+  cJSON *pin_power_json = cJSON_GetObjectItem(input_params_json, "power");
+  if (pin_power_json != NULL) {
+    esp_request->pin_power =
+        strcmp(pin_power_json->valuestring, "on") == 0 ? true : false;
+  }
 
-	cJSON *model_json = cJSON_GetObjectItem(input_params_json, "model");
-	if (model_json != NULL) {
-		esp_request->model = calloc(strlen(model_json->valuestring) + 1, sizeof(char));
-		if (esp_request->model == NULL) {
-			return false;
-		}
-		strcpy(esp_request->model, model_json->valuestring);
-	}
+  cJSON *sensor_json = cJSON_GetObjectItem(input_params_json, "sensor");
+  if (sensor_json != NULL) {
+    esp_request->sensor =
+        calloc(strlen(sensor_json->valuestring) + 1, sizeof(char));
+    if (esp_request->sensor == NULL) {
+      return false;
+    }
+    strcpy(esp_request->sensor, sensor_json->valuestring);
+  }
 
-	return true;
+  cJSON *model_json = cJSON_GetObjectItem(input_params_json, "model");
+  if (model_json != NULL) {
+    esp_request->model =
+        calloc(strlen(model_json->valuestring) + 1, sizeof(char));
+    if (esp_request->model == NULL) {
+      return false;
+    }
+    strcpy(esp_request->model, model_json->valuestring);
+  }
+
+  return true;
 }
 
 char *EspResponse_to_json_string(struct EspResponse response) {
@@ -130,30 +132,38 @@ end:
 	return json_string;
 }
 
-void execute_commesp_esp_pin_action(enum EspAction action, cJSON *tuya_action_json,
-                                char **esp_action_response_json_string) {
-	struct EspRequest esp_request = EspRequest_new(action);
-	parse_esp_request_from_tuya_action_json(tuya_action_json, &esp_request);
-	struct EspResponse esp_response = EspResponse_new();
+void execute_commesp_esp_pin_action(enum EspAction action,
+                                    cJSON *tuya_action_json,
+                                    char **esp_action_response_json_string) {
+  struct EspRequest esp_request = EspRequest_new(action);
+  parse_esp_request_from_tuya_action_json(tuya_action_json,
+                                          &esp_request); // TODO parse checking
+  struct EspResponse esp_response = EspResponse_new();
 
-	switch (action) {
-		case ESP_ACTION_TOGGLE_PIN:
-			if (!ubus_invoke_toggle_esp_pin(esp_request, &esp_response)) {
-				*esp_action_response_json_string = malloc(strlen(UBUS_FAILURE_ERROR_MESSAGE) + 1);
-				if (*esp_action_response_json_string == NULL) goto end;
-				strcpy(*esp_action_response_json_string, UBUS_FAILURE_ERROR_MESSAGE);
-				goto end;
-			}
-			break;
-		case ESP_ACTION_READ_SENSOR:
-			printf("READ_SENSOR");
-			break;
-		default:
-			break;
-	}
+  switch (action) {
+  case ESP_ACTION_TOGGLE_PIN:
+    if (!ubus_invoke_esp_toggle_pin(&esp_request, &esp_response)) {
+      goto ubus_error;
+    }
+    break;
+  case ESP_ACTION_READ_SENSOR:
+    if (!ubus_invoke_esp_read_sensor(&esp_request, &esp_response)) {
+      goto ubus_error;
+    }
+    break;
+  default:
+    goto end;
+  }
 
-	*esp_action_response_json_string = EspResponse_to_json_string(esp_response);
+ubus_error:
+  *esp_action_response_json_string =
+      malloc(strlen(UBUS_FAILURE_ERROR_MESSAGE) + 1);
+  if (*esp_action_response_json_string == NULL) {
+    goto end;
+  }
+  strcpy(*esp_action_response_json_string, UBUS_FAILURE_ERROR_MESSAGE);
 end:
+	*esp_action_response_json_string = EspResponse_to_json_string(esp_response);
 	EspRequest_free(&esp_request);
 	EspResponse_free(&esp_response);
 }

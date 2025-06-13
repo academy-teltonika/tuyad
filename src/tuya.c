@@ -3,6 +3,8 @@
 
 #include "arguments.h"
 
+#include <stdio.h>
+#include <string.h>
 #include <tuyalink_core.h>
 #include <tuya_cacert.h>
 #include <log.h>
@@ -14,84 +16,108 @@
 
 #define TUYA_ACTION_FILE_PATH "/tmp/tuya_action.log"
 
-#define PARSE_TUYA_ACTION_ERROR_FORMAT "{\"result\":\"err\", \"message\":\"%s\"}"
+#define PARSE_TUYA_ACTION_ERROR_FORMAT "{\"result\":\"err\",\"message\":\"%s\"}"
 
-enum ParseTuyaActionResult {
+extern struct ubus_context *g_ubus_context;
+tuya_mqtt_context_t g_tuya_context;
+
+enum ParseTuyaActionResultType {
     PARSE_TUYA_ACTION_RESULT_OK,
     PARSE_TUYA_ACTION_RESULT_ERR_MALFORMED_JSON,
     PARSE_TUYA_ACTION_RESULT_ERR_METHOD_DOES_NOT_EXIST,
 };
 
-static const char *ParseTuyaActionResult_message[] = {
-    "Success.",
-    "Action JSON is malformed.",
-    "Method \"%s\" does not exist."
+struct ParseTuyaActionResult {
+    enum ParseTuyaActionResultType result;
+    char *field;
 };
 
+static const char *ParseTuyaActionResult_message[] = {
+    [PARSE_TUYA_ACTION_RESULT_OK] = "Success.",
+    [PARSE_TUYA_ACTION_RESULT_ERR_MALFORMED_JSON] = "Action JSON is malformed.",
+    [PARSE_TUYA_ACTION_RESULT_ERR_METHOD_DOES_NOT_EXIST] =
+        "Method \\\"%s\\\" does not exist."};
+
 // If result is error, response_json_string is error message,
-// otherwise, if result is sucess - NULL
-static bool
-ParseTuyaActionResult_to_tuya_response_json(enum ParseTuyaActionResult result,
-                                            char **response_json_string) {
-  if (result == PARSE_TUYA_ACTION_RESULT_OK) {
+// otherwise, if result is sucess, response_json_string will be NULL.
+static bool ParseTuyaActionResult_to_tuya_response_json_string(
+    struct ParseTuyaActionResult result, char **response_json_string) {
+  enum ParseTuyaActionResultType action_result = result.result;
+  if (action_result == PARSE_TUYA_ACTION_RESULT_OK) {
+    *response_json_string = NULL;
     return true;
   }
 
   *response_json_string = calloc(1024, sizeof(char));
-  switch (result) {
+  char *format_buf;
+  switch (action_result) {
   case PARSE_TUYA_ACTION_RESULT_ERR_MALFORMED_JSON:
-        
-      return false;
+    snprintf(*response_json_string, 1024, PARSE_TUYA_ACTION_ERROR_FORMAT,
+             ParseTuyaActionResult_message
+                 [PARSE_TUYA_ACTION_RESULT_ERR_MALFORMED_JSON]);
+    return false;
   case PARSE_TUYA_ACTION_RESULT_ERR_METHOD_DOES_NOT_EXIST:
-      return false;
+    format_buf = calloc(1024, sizeof(char));
+    snprintf(format_buf, 1024, PARSE_TUYA_ACTION_ERROR_FORMAT,
+             ParseTuyaActionResult_message
+                 [PARSE_TUYA_ACTION_RESULT_ERR_METHOD_DOES_NOT_EXIST]);
+    snprintf(*response_json_string, 1024, format_buf, result.field);
+    free(format_buf);
+    return false;
   default:
-      abort(); // should never happen.
+    abort(); // should never happen.
   }
 
   return true;
 }
 
-extern struct ubus_context *g_ubus_context;
-tuya_mqtt_context_t g_tuya_context;
-
 // Use a hash-set if there are many action codes
-static enum ParseTuyaActionResult
+// ParseTuyaActionResult.field gets set to reference of method name on invalid
+// method.
+static struct ParseTuyaActionResult
 parse_tuya_action_type(cJSON *action_json, enum TuyaAction *action) {
-    cJSON *action_code_json = cJSON_GetObjectItem(action_json, "actionCode");
-    if (action_code_json == NULL) {
-        return PARSE_TUYA_ACTION_RESULT_ERR_MALFORMED_JSON;
-    }
+  struct ParseTuyaActionResult result = {};
+  cJSON *action_code_json = cJSON_GetObjectItem(action_json, "actionCode");
+  if (action_code_json == NULL) {
+    result.result = PARSE_TUYA_ACTION_RESULT_ERR_MALFORMED_JSON;
+  }
 
-    if (strcmp(action_code_json->valuestring, "log") == 0) {
-        *action = TUYA_ACTION_LOG;
-        return PARSE_TUYA_ACTION_RESULT_OK;
-    }
-    if (strcmp(action_code_json->valuestring, "read_sensor") == 0) {
-        *action = TUYA_ACTION_ESP_READ_SENSOR;
-        return PARSE_TUYA_ACTION_RESULT_OK;
-    }
-    if (strcmp(action_code_json->valuestring, "toggle_pin") == 0) {
-        *action = TUYA_ACTION_ESP_TOGGLE_PIN;
-        return PARSE_TUYA_ACTION_RESULT_OK;
-    }
-    if (strcmp(action_code_json->valuestring, "list_devices") == 0) {
-        *action = TUYA_ACTION_ESP_LIST_DEVICES;
-        return PARSE_TUYA_ACTION_RESULT_OK;
-    }
+  if (strcmp(action_code_json->valuestring, "log") == 0) {
+    *action = TUYA_ACTION_LOG;
+    result.result = PARSE_TUYA_ACTION_RESULT_OK;
+    return result;
+  }
+  if (strcmp(action_code_json->valuestring, "read_sensor") == 0) {
+    *action = TUYA_ACTION_ESP_READ_SENSOR;
+    result.result = PARSE_TUYA_ACTION_RESULT_OK;
+    return result;
+  }
+  if (strcmp(action_code_json->valuestring, "toggle_pin") == 0) {
+    *action = TUYA_ACTION_ESP_TOGGLE_PIN;
+    result.result = PARSE_TUYA_ACTION_RESULT_OK;
+    return result;
+  }
+  if (strcmp(action_code_json->valuestring, "list_devices") == 0) {
+    *action = TUYA_ACTION_ESP_LIST_DEVICES;
+    result.result = PARSE_TUYA_ACTION_RESULT_OK;
+    return result;
+  }
 
-    return PARSE_TUYA_ACTION_RESULT_ERR_METHOD_DOES_NOT_EXIST;
+  result.result = PARSE_TUYA_ACTION_RESULT_ERR_METHOD_DOES_NOT_EXIST;
+  result.field = action_code_json->valuestring;
+  return result;
 }
 
 static void execute_tuya_action(struct tuya_mqtt_context *context,
                                 const tuyalink_message_t *msg) {
   enum TuyaAction tuya_action;
-  char *response_json_string = NULL;
+  char *response_json_string;
 
   cJSON *action_json = cJSON_Parse(msg->data_string);
-  enum ParseTuyaActionResult ret =
+  struct ParseTuyaActionResult ret =
       parse_tuya_action_type(action_json, &tuya_action);
-  if (!ParseTuyaActionResult_to_tuya_response_json(ret,
-                                                   &response_json_string)) {
+  if (!ParseTuyaActionResult_to_tuya_response_json_string(
+          ret, &response_json_string)) {
     goto end;
   }
 
@@ -109,6 +135,7 @@ static void execute_tuya_action(struct tuya_mqtt_context *context,
   }
 
 end:
+  printf("RESP: %s\n", response_json_string);
   tuyalink_thing_property_report(&g_tuya_context, NULL, response_json_string);
   cJSON_Delete(action_json);
   free(response_json_string);
