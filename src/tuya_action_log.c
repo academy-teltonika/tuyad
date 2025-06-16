@@ -2,7 +2,6 @@
 #include "tuya.h"
 
 #include "log_level.h"
-#include <sys/sysinfo.h>
 #include <syslog.h>
 #include <cJSON.h>
 #include <stdlib.h>
@@ -21,38 +20,6 @@ static const char *FILE_OPERATION_RESULT_MESSAGE[] = {
     "Failed to write to file.",
     "Failed to close file."
 };
-
-char *create_sysinfo_json(struct SystemInfo *systemInfo) { // TODO static
-    char *json_string = NULL;
-    char field_buffer[256];
-    cJSON *packet = cJSON_CreateObject();
-
-    if (systemInfo == NULL) {
-        goto end;
-    }
-
-    snprintf(field_buffer, sizeof(field_buffer), "%u", systemInfo->uptime);
-    if (cJSON_AddStringToObject(packet, "uptime", field_buffer) == NULL) goto end;
-    snprintf(field_buffer, sizeof(field_buffer), "%llu", systemInfo->total);
-    if (cJSON_AddStringToObject(packet, "totalram", field_buffer) == NULL) goto end;
-    snprintf(field_buffer, sizeof(field_buffer), "%llu", systemInfo->free);
-    if (cJSON_AddStringToObject(packet, "freeram", field_buffer) == NULL) goto end;
-
-    cJSON *loads = cJSON_AddArrayToObject(packet, "loads");
-    if (loads == NULL) goto end;
-    for (int i = 0; i < 3; i++) {
-        snprintf(field_buffer, sizeof(field_buffer), "%u", systemInfo->load[i]);
-        cJSON *load = cJSON_CreateString(field_buffer);
-        if (load == NULL) goto end;
-        cJSON_AddItemToArray(loads, load);
-    }
-
-end:
-    json_string = cJSON_Print(packet);
-    cJSON_Delete(packet);
-    cJSON_Minify(json_string);
-    return json_string;
-}
 
 static char *parse_log_message_json(char *json_string) {
     cJSON *json = cJSON_Parse(json_string);
@@ -78,7 +45,7 @@ static enum FileOperationResult append_message_to_file(char *filepath, char *mes
         fclose(file);
         return FILE_OPERATION_RESULT_ERROR_WRITE;
     }
-    fwrite("\n", sizeof(char), 1, file); // maybe should check for error
+    fwrite("\n", sizeof(char), 1, file); // TODO: maybe should check for error
 
     ret = fclose(file);
     if (ret == EOF) {

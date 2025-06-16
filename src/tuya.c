@@ -36,13 +36,13 @@ struct ParseTuyaActionResult {
 static const char *ParseTuyaActionResult_message[] = {
     [PARSE_TUYA_ACTION_RESULT_OK] = "Success.",
     [PARSE_TUYA_ACTION_RESULT_ERR_MALFORMED_JSON] = "Action JSON is malformed.",
-    [PARSE_TUYA_ACTION_RESULT_ERR_METHOD_DOES_NOT_EXIST] =
-        "Method \\\"%s\\\" does not exist."};
+    [PARSE_TUYA_ACTION_RESULT_ERR_METHOD_DOES_NOT_EXIST] = "Method \\\"%s\\\" does not exist."};
 
 // If result is error, response_json_string is error message,
 // otherwise, if result is sucess, response_json_string will be NULL.
 static bool ParseTuyaActionResult_to_tuya_response_json_string(
     struct ParseTuyaActionResult result, char **response_json_string) {
+
   enum ParseTuyaActionResultType action_result = result.result;
   if (action_result == PARSE_TUYA_ACTION_RESULT_OK) {
     *response_json_string = NULL;
@@ -113,7 +113,7 @@ static void execute_tuya_action(struct tuya_mqtt_context *context,
   char *response_json_string;
 
   cJSON *action_json = cJSON_Parse(msg->data_string);
-  struct ParseTuyaActionResult ret =
+  struct ParseTuyaActionResult ret = // TODO: Consolidate into one parse function.
       parse_tuya_action_type(action_json, &tuya_action);
   if (!ParseTuyaActionResult_to_tuya_response_json_string(
           ret, &response_json_string)) {
@@ -130,6 +130,9 @@ static void execute_tuya_action(struct tuya_mqtt_context *context,
     execute_commesp_list_devices(&response_json_string);
     break;
   case TUYA_ACTION_LOG:
+    break;
+  case TUYA_ACTION_SYSTEM_INFO:
+    execute_
     break;
   }
 

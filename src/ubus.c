@@ -11,13 +11,14 @@
 
 struct ubus_context *g_ubus_context;
 
-struct SystemInfo *ubus_invoke_get_system_info(struct SystemInfo *systemInfo) {
+
+enum UbusSystemActionResult ubus_invoke_get_system_info(struct SystemInfo *systemInfo) {
   unsigned int id;
   if (ubus_lookup_id(g_ubus_context, "system", &id) ||
       ubus_invoke(g_ubus_context, id, "info", NULL, ubus_parse_system_info, systemInfo,
                   3000)) {
     syslog(LOG_LEVEL_ERROR, "Failed to request system info from system.");
-    return NULL;
+    return UBUS_SYSTEM_ACTION_RESULT_ERR_SYSTEM_NOT_FOUND;
   }
 
   if (!systemInfo->parsed_successfuly) {
@@ -28,60 +29,60 @@ struct SystemInfo *ubus_invoke_get_system_info(struct SystemInfo *systemInfo) {
   return systemInfo;
 }
 
-bool ubus_invoke_esp_toggle_pin(struct EspRequest* request,
+enum UbusCommespActionResult ubus_invoke_esp_toggle_pin(struct EspRequest* request,
                                 struct EspResponse *response) {
-  bool success = true;
   unsigned int id;
   if (ubus_lookup_id(g_ubus_context, ESP_COMMUNICATION_DAEMON_NAME, &id) != 0) {
-    return false;
+    return UBUS_COMMESP_ACTION_RESULT_ERR_COMMESPD_NOT_FOUND;
   }
 
+  enum UbusCommespActionResult result = UBUS_COMMESP_ACTION_RESULT_OK;
   struct blob_buf ubus_message = {};
   blob_buf_init(&ubus_message, 0);
   create_ubus_message_from_esp_request(&ubus_message, request);
   if (ubus_invoke(g_ubus_context, id, request->pin_power ? "on" : "off",
                   ubus_message.head, ubus_parse_commesp_esp_action_response,
                   response, 3000) != 0) {
-    success = false;
+    result = UBUS_COMMESP_ACTION_RESULT_ERR_COMMESPD_ACTION_FAILED;
   }
 
   blob_buf_free(&ubus_message);
-  return success;
+  return result;
 }
 
-bool ubus_invoke_list_esp_devices(struct EspDevices *devices) {
+enum UbusCommespActionResult ubus_invoke_list_esp_devices(struct EspDevices *devices) {
   unsigned int id;
   if (ubus_lookup_id(g_ubus_context, ESP_COMMUNICATION_DAEMON_NAME, &id) != 0) {
-    return false;
+    return UBUS_COMMESP_ACTION_RESULT_ERR_COMMESPD_NOT_FOUND;
   }
 
   if (ubus_invoke(g_ubus_context, id, "devices", NULL,
                   ubus_parse_commesp_devices, devices, 3000) != 0) {
-    return false;
+    return UBUS_COMMESP_ACTION_RESULT_ERR_COMMESPD_ACTION_FAILED;
   }
 
-  return true;
+  return UBUS_COMMESP_ACTION_RESULT_OK;
 }
 
-bool ubus_invoke_esp_read_sensor(struct EspRequest *request,
+enum UbusCommespActionResult ubus_invoke_esp_read_sensor(struct EspRequest *request,
                                  struct EspResponse *response) {
-  bool success = true;
   unsigned int id;
   if (ubus_lookup_id(g_ubus_context, ESP_COMMUNICATION_DAEMON_NAME, &id) != 0) {
-    return false;
+    return UBUS_COMMESP_ACTION_RESULT_ERR_COMMESPD_NOT_FOUND;
   }
 
+  enum UbusCommespActionResult result = UBUS_COMMESP_ACTION_RESULT_OK;
   struct blob_buf ubus_message = {};
   blob_buf_init(&ubus_message, 0);
   create_ubus_message_from_esp_request(&ubus_message, request);
   if (ubus_invoke(g_ubus_context, id, "get", ubus_message.head,
                   ubus_parse_commesp_esp_action_response, response,
                   3000) != 0) {
-    success =  false;
+    result = UBUS_COMMESP_ACTION_RESULT_ERR_COMMESPD_ACTION_FAILED;
   }
 
   blob_buf_free(&ubus_message);
-  return success;
+  return result;
 }
 
 bool ubus_init() {
