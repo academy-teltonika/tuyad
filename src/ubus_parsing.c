@@ -1,9 +1,8 @@
 #include "ubus_parsing.h"
+#include "ubus_action_esp.h"
+#include "ubus_action_system.h"
 
-#include "tuya_action_esp.h"
-#include "tuya_action_log.h"
 #include <assert.h>
-#include <libubox/blobmsg.h>
 
 enum {
 	SYSTEM_INFO_MEMORY,

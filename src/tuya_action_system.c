@@ -1,3 +1,5 @@
+#include "cJSON.h"
+#include <stdio.h>
 char *create_sysinfo_json(struct SystemInfo *systemInfo) { // TODO static
     char *json_string = NULL;
     char field_buffer[256];

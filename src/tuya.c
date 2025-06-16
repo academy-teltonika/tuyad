@@ -132,7 +132,7 @@ static void execute_tuya_action(struct tuya_mqtt_context *context,
   case TUYA_ACTION_LOG:
     break;
   case TUYA_ACTION_SYSTEM_INFO:
-    execute_
+    // execute_
     break;
   }
 
