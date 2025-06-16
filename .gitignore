@@ -1,4 +1,4 @@
 build/
 src/compile_commands.json
 src/.cache
-# .cache
+.cache
