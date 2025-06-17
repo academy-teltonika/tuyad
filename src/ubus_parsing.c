@@ -96,34 +96,35 @@ void ubus_parse_commesp_esp_action_response(struct ubus_request *req, int type, 
 
 	// TODO move out into function.
   struct blob_attr *dht_table[__ESP_RESPONSE_SENSOR_MAX];
-	switch (esp_response->tag) {
-		case ESP_ACTION_TOGGLE_PIN:
-			assert(esp_response_table[ESP_RESPONSE_DATA] == NULL); // Toggle pin must not return any data - if it does - something's wrong.
-		case ESP_ACTION_READ_SENSOR:
-			if (esp_response_table[ESP_RESPONSE_DATA] == NULL) {
-				if (esp_response->success == true) { // TODO: MAKE ESPCOMMD RETURN ERR ON DHT RETURNED NO DATA!!!!!!!!!! (not yet implemented)
-					esp_response->parsed_successfuly = false;
-				}
-				break;
-			}
-			blobmsg_parse(
-      	esp_action_response_sensor_data_policy,
-      	__ESP_RESPONSE_SENSOR_MAX,
-      	dht_table,
-      	blobmsg_data(esp_response_table[ESP_RESPONSE_DATA]),
-      	blobmsg_data_len(esp_response_table[ESP_RESPONSE_DATA])
-      );
-			if (
-				dht_table[ESP_RESPONSE_SENSOR_TEMPERATURE] != NULL &&
-				dht_table[ESP_RESPONSE_SENSOR_HUMIDITY] != NULL) {
-					esp_response->sensor_reading->temperature = blobmsg_get_double(dht_table[ESP_RESPONSE_SENSOR_TEMPERATURE]);
-					esp_response->sensor_reading->humidity = blobmsg_get_double(dht_table[ESP_RESPONSE_SENSOR_HUMIDITY]);
-				} else {
-					esp_response->parsed_successfuly = false;
-				}
-			
-			break;
-		}
+
+  switch (esp_response->tag) {
+  case ESP_ACTION_TOGGLE_PIN:
+    // Toggle pin must not return any data - if it does - something's wrong.
+    assert(esp_response_table[ESP_RESPONSE_DATA] == NULL);
+    break;
+  case ESP_ACTION_READ_SENSOR:
+    if (esp_response_table[ESP_RESPONSE_DATA] == NULL) {
+      // TODO: MAKE ESPCOMMD RETURN ERR ON "DHT RETURNED NO DATA" INSTEAD OF OK.
+      // if (esp_response->success == true) {
+      //   esp_response->parsed_successfuly = false;
+      // }
+      break;
+    }
+    blobmsg_parse(esp_action_response_sensor_data_policy,
+                  __ESP_RESPONSE_SENSOR_MAX, dht_table,
+                  blobmsg_data(esp_response_table[ESP_RESPONSE_DATA]),
+                  blobmsg_data_len(esp_response_table[ESP_RESPONSE_DATA]));
+    if (dht_table[ESP_RESPONSE_SENSOR_TEMPERATURE] != NULL &&
+        dht_table[ESP_RESPONSE_SENSOR_HUMIDITY] != NULL) {
+      esp_response->sensor_reading->temperature =
+          blobmsg_get_double(dht_table[ESP_RESPONSE_SENSOR_TEMPERATURE]);
+      esp_response->sensor_reading->humidity =
+          blobmsg_get_double(dht_table[ESP_RESPONSE_SENSOR_HUMIDITY]);
+    } else {
+      esp_response->parsed_successfuly = false;
+    }
+    break;
+  }
 }
 
 void ubus_parse_commesp_devices(struct ubus_request *req, int type, struct blob_attr *msg) {

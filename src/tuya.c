@@ -1,5 +1,7 @@
 #include "tuya.h"
 #include "tuya_action_esp.h"
+#include "tuya_action_log.h"
+#include "tuya_action_system.h"
 
 #include "arguments.h"
 
@@ -17,6 +19,7 @@
 
 #define TUYA_ACTION_FILE_PATH "/tmp/tuya_action.log"
 
+// TODO: Replace by tuya_error.c/h
 #define PARSE_TUYA_ACTION_ERROR_FORMAT "{\"result\":\"err\",\"message\":\"%s\"}"
 
 extern struct ubus_context *g_ubus_context;
@@ -39,7 +42,7 @@ static const char *ParseTuyaActionResult_message[] = {
     [PARSE_TUYA_ACTION_RESULT_ERR_METHOD_DOES_NOT_EXIST] = "Method \\\"%s\\\" does not exist."};
 
 // If result is error, response_json_string is error message,
-// otherwise, if result is sucess, response_json_string will be NULL.
+// otherwise, if result is success, response_json_string will be NULL.
 static bool ParseTuyaActionResult_to_tuya_response_json_string(
     struct ParseTuyaActionResult result, char **response_json_string) {
 
@@ -101,6 +104,11 @@ parse_tuya_action_type(cJSON *action_json, enum TuyaAction *action) {
     result.result = PARSE_TUYA_ACTION_RESULT_OK;
     return result;
   }
+  if (strcmp(action_code_json->valuestring, "sysinfo") == 0) {
+    *action = TUYA_ACTION_SYSTEM_INFO;
+    result.result = PARSE_TUYA_ACTION_RESULT_OK;
+    return result;
+  }
 
   result.result = PARSE_TUYA_ACTION_RESULT_ERR_METHOD_DOES_NOT_EXIST;
   result.field = action_code_json->valuestring;
@@ -112,11 +120,11 @@ static void execute_tuya_action(struct tuya_mqtt_context *context,
   enum TuyaAction tuya_action;
   char *response_json_string;
 
+  // TODO: Consolidate into one parse function.
   cJSON *action_json = cJSON_Parse(msg->data_string);
-  struct ParseTuyaActionResult ret = // TODO: Consolidate into one parse function.
-      parse_tuya_action_type(action_json, &tuya_action);
-  if (!ParseTuyaActionResult_to_tuya_response_json_string(
-          ret, &response_json_string)) {
+
+  struct ParseTuyaActionResult ret = parse_tuya_action_type(action_json, &tuya_action);
+  if (!ParseTuyaActionResult_to_tuya_response_json_string(ret, &response_json_string)) {
     goto end;
   }
 
@@ -130,9 +138,10 @@ static void execute_tuya_action(struct tuya_mqtt_context *context,
     execute_commesp_list_devices(&response_json_string);
     break;
   case TUYA_ACTION_LOG:
+    execute_log_to_file(action_json, &response_json_string);
     break;
   case TUYA_ACTION_SYSTEM_INFO:
-    // execute_
+    execute_system_get_info(&response_json_string);
     break;
   }
 

@@ -12,11 +12,10 @@ struct SystemInfo {
 enum UbusSystemActionResult {
   UBUS_SYSTEM_ACTION_RESULT_OK,
   UBUS_SYSTEM_ACTION_RESULT_ERR_SYSTEM_NOT_FOUND,
+  UBUS_SYSTEM_ACTION_RESULT_ERR_ACTION_FAILED,
+  UBUS_SYSTEM_ACTION_RESULT_ERR_PARSE_FAILED,
 };
 
-const char* UbusSystemActinoResult_messages[] = {
-  [UBUS_SYSTEM_ACTION_RESULT_OK] = "Success.",
-  [UBUS_SYSTEM_ACTION_RESULT_ERR_SYSTEM_NOT_FOUND] = "Communication with ubus \"system\" module failed.",
-};
+extern const char* UbusSystemActionResult_messages[];
 
 enum UbusSystemActionResult ubus_invoke_get_system_info(struct SystemInfo *systemInfo);

@@ -2,28 +2,35 @@
 
 ## Quick-start guide
 
-1. Install ubus and esp-controller
+1. Install ubus and espcommd.
 2. Install this application using "cmake . && make"
-2. Start ubusd and run the esp-controller
+2. Start ubusd and run espcommd. 
 3. Start this application with the correct tuya credentials (-p <PRODUCT_ID> -d <DEVICE_ID> -s <DEVICE_SECRET)
 4. Send commands using Tuya actions and observe the results
 
 ## Tuya action codes
 
-list_devices (does not require any arguments) <br>
-toggle_pin (required arguments): <br>
+list_devices
+
+sysinfo
+
+toggle_pin (required arguments):
 
 1. port: string
 2. pin: integer
 3. power: enum <"on"|"off">
 
-# TODO
+read_sensor (required arguments):
 
-1. Implement graceful ubus failure handling. Right now the application only support graceful failure when the _commesp_
-   module is down.
+1. port: string
+2. pin: integer
+3. sendor: string
+4. model: string
 
-2. Create OpenWRT packages and install the application into the router.
+## TODO
 
-3. Restore "write to log" Tuya action functionality.
-
-4. Finish implementing the Tuya action for reading sensor data (80% done, but ran out of time).
+[ ] Implement graceful ubus failure handling. Possible to restart?
+[ ] Create OpenWRT packages and install the application into the router.
+[x] Restore "write to log" Tuya action functionality.
+[x] Finish implementing the Tuya action for reading sensor data.
+[ ] Fix "DHT returned no data" being OK (should be Err).

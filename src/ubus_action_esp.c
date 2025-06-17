@@ -3,7 +3,12 @@
 #include "ubus_parsing.h"
 #include <libubus.h>
 
-#define ESP_COMMUNICATION_DAEMON_NAME "espcommd"
+const char* UbusCommespActionResult_messages[] = {
+  [UBUS_COMMESP_ACTION_RESULT_OK] = "Success.",
+  [UBUS_COMMESP_ACTION_RESULT_ERR_COMMESPD_NOT_FOUND] = "Failed to find \\\"commespd\\\" ubus server.",
+  [UBUS_COMMESP_ACTION_RESULT_ERR_COMMESPD_ACTION_FAILED] = "Failed to invoke ubus method on \\\"commespd\\\".",
+  [UBUS_COMMESP_ACTION_RESULT_ERR_PARSE_FAILED] = "Failed to parse ubus response from \\\"commespd\\\"."
+};
 
 static void create_ubus_message_from_esp_request(struct blob_buf *request_buf,
                                           struct EspRequest *request) {

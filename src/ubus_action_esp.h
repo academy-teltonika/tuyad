@@ -1,19 +1,16 @@
 #pragma once
+
 #include <stdbool.h>
+
+extern const char* UbusCommespActionResult_messages[];
 
 enum UbusCommespActionResult {
   UBUS_COMMESP_ACTION_RESULT_OK,
   UBUS_COMMESP_ACTION_RESULT_ERR_COMMESPD_NOT_FOUND,
   UBUS_COMMESP_ACTION_RESULT_ERR_COMMESPD_ACTION_FAILED,
+  UBUS_COMMESP_ACTION_RESULT_ERR_PARSE_FAILED,
 };
 
-const char* UbusActionResult_messages[] = {
-  [UBUS_COMMESP_ACTION_RESULT_OK] = "Success.",
-  [UBUS_COMMESP_ACTION_RESULT_ERR_COMMESPD_NOT_FOUND] = "Communication with ubus \"commespd\" module failed.",
-  [UBUS_COMMESP_ACTION_RESULT_ERR_COMMESPD_ACTION_FAILED] = "Unknown failure while executing commespd action."
-};
-
- 
 enum EspAction {
 	ESP_ACTION_TOGGLE_PIN,
 	ESP_ACTION_READ_SENSOR,
@@ -51,7 +48,6 @@ struct EspResponse {
 	};
 	bool parsed_successfuly;
 };
-
 
 struct EspDevice {
 	char *port;

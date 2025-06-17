@@ -1,15 +1,13 @@
 #include "tuya_action_esp.h"
 #include <tuyalink_core.h>
-#include "tuya.h"
 #include "ubus.h"
+#include "ubus_action_esp.h"
+#include "ubus_action_system.h"
+#include "tuya_error.h"
 
 #include <assert.h>
 
-// If more complex ubus error handling is required, this should be refactored into a function which forms the error message
-#define UBUS_PARSE_RESPONSE_ERROR_MESSAGE "{\"result\":\"err\", \"message\":\"Failed to parse ubus response.\"}"
-#define UBUS_FAILURE_ERROR_MESSAGE "{\"result\":\"err\", \"message\":\"Ubus failure.\"}"
-
-bool parse_esp_request_from_tuya_action_json(cJSON *action_json,
+static bool parse_esp_request_from_tuya_action_json(cJSON *action_json,
                                              struct EspRequest *esp_request) {
   cJSON *input_params_json = cJSON_GetObjectItem(action_json, "inputParams");
   if (input_params_json == NULL) {
@@ -60,8 +58,8 @@ bool parse_esp_request_from_tuya_action_json(cJSON *action_json,
   return true;
 }
 
-// TODO: this can potentioly fail - add error handling.
-char *EspResponse_to_json_string(struct EspResponse response) {
+// TODO: this can potentialy fail - add error handling.
+static char *EspResponse_to_json_string(struct EspResponse response) {
   char *json_string = NULL;
   char field_buffer[1024];
   cJSON *packet = cJSON_CreateObject();
@@ -102,7 +100,7 @@ end:
 	return json_string;
 }
 
-char *EspDevices_to_json_string(struct EspDevices *device_list) {
+static char *EspDevices_to_json_string(struct EspDevices *device_list) {
 	char *json_string = NULL;
 	char field_buffer[1024];
 	cJSON *packet = cJSON_CreateObject();
@@ -144,11 +142,24 @@ end:
 	return json_string;
 }
 
+static char *create_ubus_error_json(enum UbusCommespActionResult result) {
+  switch (result) {
+  case UBUS_COMMESP_ACTION_RESULT_OK:
+  	assert(false); // You passed a OK as an error.
+  case UBUS_COMMESP_ACTION_RESULT_ERR_COMMESPD_NOT_FOUND:
+    return create_tuya_response_json(UbusCommespActionResult_messages[UBUS_COMMESP_ACTION_RESULT_ERR_COMMESPD_NOT_FOUND], false);
+  case UBUS_COMMESP_ACTION_RESULT_ERR_COMMESPD_ACTION_FAILED:
+    return create_tuya_response_json(UbusCommespActionResult_messages [UBUS_COMMESP_ACTION_RESULT_ERR_COMMESPD_ACTION_FAILED], false);
+  case UBUS_COMMESP_ACTION_RESULT_ERR_PARSE_FAILED:
+    return create_tuya_response_json(UbusCommespActionResult_messages [UBUS_COMMESP_ACTION_RESULT_ERR_PARSE_FAILED], false);
+  }
+  assert(false); // Never happens, but compiler complains without it.
+}
+
 void execute_commesp_esp_pin_action(enum EspAction action,
                                     cJSON *tuya_action_json,
                                     char **esp_action_response_json_string) {
-	bool success = true;
-	
+	enum UbusCommespActionResult result = UBUS_COMMESP_ACTION_RESULT_OK;
   struct EspRequest esp_request = EspRequest_new(action);
   parse_esp_request_from_tuya_action_json(tuya_action_json,
                                           &esp_request); // TODO parse checking
@@ -156,47 +167,36 @@ void execute_commesp_esp_pin_action(enum EspAction action,
 
   switch (action) {
   case ESP_ACTION_TOGGLE_PIN:
-    if (!ubus_invoke_esp_toggle_pin(&esp_request, &esp_response)) {
-    	success = false;
-    }
+		result = ubus_invoke_esp_toggle_pin(&esp_request, &esp_response);
     break;
   case ESP_ACTION_READ_SENSOR:
   	esp_response.sensor_reading = malloc(sizeof(struct DHTSensorReading));
-    if (!ubus_invoke_esp_read_sensor(&esp_request, &esp_response)) {
-    	success = false;
-    }
-    break;
+		result = ubus_invoke_esp_read_sensor(&esp_request, &esp_response);
+		break;
   default:
-  break;
+  	break;
   }
 
-  if (success) {
-  		*esp_action_response_json_string = EspResponse_to_json_string(esp_response);
+  if (result != UBUS_COMMESP_ACTION_RESULT_OK) {
+  	*esp_action_response_json_string = create_ubus_error_json(result);
   } else {
-    *esp_action_response_json_string =
-        malloc(strlen(UBUS_FAILURE_ERROR_MESSAGE) + 1);
-    if (*esp_action_response_json_string == NULL) {
-      goto cleanup;
-    }
-    strcpy(*esp_action_response_json_string, UBUS_FAILURE_ERROR_MESSAGE);
+  	*esp_action_response_json_string = EspResponse_to_json_string(esp_response);
   }
 
-cleanup:
 	EspRequest_free(&esp_request);
 	EspResponse_free(&esp_response);
 }
 
 void execute_commesp_list_devices(char **commesp_resposne_json) {
 	struct EspDevices device_list = EspDevices_new();
-	if (!ubus_invoke_list_esp_devices(&device_list)) {
-		*commesp_resposne_json = malloc(strlen(UBUS_FAILURE_ERROR_MESSAGE) + 1);
-		if (*commesp_resposne_json == NULL) goto end;
-		strcpy(*commesp_resposne_json, UBUS_FAILURE_ERROR_MESSAGE);
-		goto end;
+	enum UbusCommespActionResult result = ubus_invoke_list_esp_devices(&device_list);
+
+	if (result != UBUS_COMMESP_ACTION_RESULT_OK) {
+		*commesp_resposne_json = create_ubus_error_json(result);
+	} else {
+		*commesp_resposne_json = EspDevices_to_json_string(&device_list);
 	}
 
-	*commesp_resposne_json = EspDevices_to_json_string(&device_list);
-end:
 	EspDevices_free(&device_list);
 }
 

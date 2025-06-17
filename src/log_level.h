@@ -1,6 +1,7 @@
 #pragma once
-// This wrapper exists, because the Tuya logging module has some macro definitions that conflict with syslog.
+#include <syslog.h>
 
+// This wrapper exists, because the Tuya logging module has some macro definitions that conflict with syslog.
 enum LogLevel {
     LOG_LEVEL_EMERGENCY,
     LOG_LEVEL_ALERT,

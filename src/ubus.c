@@ -10,5 +10,3 @@ bool ubus_init() {
 }
 
 void ubus_deinit() { ubus_free(g_ubus_context); }
-
-
