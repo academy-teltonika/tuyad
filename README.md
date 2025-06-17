@@ -29,8 +29,8 @@ read_sensor (required arguments):
 
 ## TODO
 
-[ ] Implement graceful ubus failure handling. Possible to restart?
-[ ] Create OpenWRT packages and install the application into the router.
-[x] Restore "write to log" Tuya action functionality.
-[x] Finish implementing the Tuya action for reading sensor data.
-[ ] Fix "DHT returned no data" being OK (should be Err).
+- [ ] Implement graceful ubus failure handling. Possible to restart?
+- [ ] Create OpenWRT packages and install the application into the router.
+- [x] Restore "write to log" Tuya action functionality.
+- [x] Finish implementing the Tuya action for reading sensor data.
+- [ ] Fix "DHT returned no data" being OK (should be Err).
