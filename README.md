@@ -14,6 +14,10 @@ list_devices
 
 sysinfo
 
+log (required arguments):
+
+1. message: string
+
 toggle_pin (required arguments):
 
 1. port: string
