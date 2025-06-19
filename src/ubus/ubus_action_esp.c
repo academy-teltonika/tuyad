@@ -43,7 +43,7 @@ enum UbusCommespActionResult ubus_invoke_esp_toggle_pin(struct EspRequest* reque
   blob_buf_init(&ubus_message, 0);
   create_ubus_message_from_esp_request(&ubus_message, request);
   if (ubus_invoke(g_ubus_context, id, request->pin_power ? "on" : "off",
-                  ubus_message.head, ubus_parse_commesp_esp_action_response,
+                  ubus_message.head, ubus_parse_commesp_action_response,
                   response, 3000) != 0) {
     result = UBUS_COMMESP_ACTION_RESULT_ERR_COMMESPD_ACTION_FAILED;
   }
@@ -78,7 +78,7 @@ enum UbusCommespActionResult ubus_invoke_esp_read_sensor(struct EspRequest *requ
   blob_buf_init(&ubus_message, 0);
   create_ubus_message_from_esp_request(&ubus_message, request);
   if (ubus_invoke(g_ubus_context, id, "get", ubus_message.head,
-                  ubus_parse_commesp_esp_action_response, response,
+                  ubus_parse_commesp_action_response, response,
                   3000) != 0) {
     result = UBUS_COMMESP_ACTION_RESULT_ERR_COMMESPD_ACTION_FAILED;
   }

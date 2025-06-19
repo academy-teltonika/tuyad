@@ -45,7 +45,6 @@ int main(int argc, char **argv) {
 
   syslog(LOG_LEVEL_INFO, "Tuya daemon started succesfully.");
 
-  // System info logging functionality was removed.
   while (g_running) {
     tuya_mqtt_loop(&g_tuya_context);
   }

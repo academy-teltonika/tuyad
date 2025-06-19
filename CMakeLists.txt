@@ -3,13 +3,21 @@ project(Tuyad)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_C_STANDARD 11)
 
+file(GLOB_RECURSE SOURCES "src/*.c")
+file(GLOB_RECURSE HEADERS "src/*.h")
+
+set(INCLUDE_DIRS "")
+foreach(header ${HEADERS})
+    get_filename_component(dir ${header} DIRECTORY)
+    list(APPEND INCLUDE_DIRS ${dir})
+endforeach()
+list(REMOVE_DUPLICATES INCLUDE_DIRS)
+
 include_directories(
-  ${PROJECT_SOURCE_DIR}/src
+  ${INCLUDE_DIRS}
   /usr/local/include/libtuya
 )
 
-file(GLOB SOURCES "src/*.c")
- 
 add_executable(tuyad ${SOURCES})
 
 target_link_libraries(
@@ -25,13 +33,11 @@ target_link_libraries(
 )
 
 target_compile_options(tuyad PRIVATE
-  -Wall
-  # -Werror
-  -fsanitize=address
-  -g
+    $<$<CONFIG:DEBUG>: -Wall -fsanitize=address -g >
 )
 
 target_link_options(tuyad PRIVATE
-  -fsanitize=address
+    $<$<CONFIG:DEBUG>: -fsanitize=address >
 )
 
+install(TARGETS tuyad RUNTIME DESTINATION bin)

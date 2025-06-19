@@ -31,14 +31,14 @@ enum {
 };
 
 enum {
-	COMMESP_DEVICES,
+	ESP_DEVICES,
 	__COMMESP_MAX
 };
 
 enum {
-	COMMESP_DEVICE_PORT,
-	COMMESP_DEVICE_VID,
-	COMMESP_DEVICE_PID,
+	ESP_DEVICE_PORT,
+	ESP_DEVICE_VID,
+	ESP_DEVICE_PID,
 	__COMMESP_DEVICE_MAX
 };
 
@@ -64,17 +64,42 @@ static const struct blobmsg_policy esp_action_response_sensor_data_policy[__ESP_
 	[ESP_RESPONSE_SENSOR_HUMIDITY] = {.name = "humidity", BLOBMSG_TYPE_DOUBLE},
 };
 
-static const struct blobmsg_policy commesp_policy[__COMMESP_MAX] = {
-	[COMMESP_DEVICES] = {.name = "devices", .type = BLOBMSG_TYPE_ARRAY},
+static const struct blobmsg_policy esp_devices_policy[__COMMESP_MAX] = {
+	[ESP_DEVICES] = {.name = "devices", .type = BLOBMSG_TYPE_ARRAY},
 };
 
-static const struct blobmsg_policy commesp_device_properties_policy[__COMMESP_DEVICE_MAX] = {
-	[COMMESP_DEVICE_PORT] = {.name = "port", .type = BLOBMSG_TYPE_STRING},
-	[COMMESP_DEVICE_VID] = {.name = "vid", .type = BLOBMSG_TYPE_STRING},
-	[COMMESP_DEVICE_PID] = {.name = "pid", .type = BLOBMSG_TYPE_STRING},
+static const struct blobmsg_policy esp_device_properties_policy[__COMMESP_DEVICE_MAX] = {
+	[ESP_DEVICE_PORT] = {.name = "port", .type = BLOBMSG_TYPE_STRING},
+	[ESP_DEVICE_VID] = {.name = "vid", .type = BLOBMSG_TYPE_STRING},
+	[ESP_DEVICE_PID] = {.name = "pid", .type = BLOBMSG_TYPE_STRING},
 };
 
-void ubus_parse_commesp_esp_action_response(struct ubus_request *req, int type, struct blob_attr *msg) {
+static void parse_commesp_read_sensor_response_sensor_data(
+    struct EspResponse *response, struct blob_attr **esp_response_table) {
+  if (response->success == true &&
+      esp_response_table[ESP_RESPONSE_DATA] == NULL) {
+  	return;
+  }
+
+  struct blob_attr *dht_table[__ESP_RESPONSE_SENSOR_MAX];
+  blobmsg_parse(esp_action_response_sensor_data_policy,
+                __ESP_RESPONSE_SENSOR_MAX, dht_table,
+                blobmsg_data(esp_response_table[ESP_RESPONSE_DATA]),
+                blobmsg_data_len(esp_response_table[ESP_RESPONSE_DATA]));
+  if (dht_table[ESP_RESPONSE_SENSOR_TEMPERATURE] == NULL ||
+      dht_table[ESP_RESPONSE_SENSOR_HUMIDITY] == NULL) {
+    // response->parsed_successfuly = false;
+    return;
+  }
+
+	response->sensor_reading = malloc(sizeof(struct DHTSensorReading));
+  response->sensor_reading->temperature =
+      blobmsg_get_double(dht_table[ESP_RESPONSE_SENSOR_TEMPERATURE]);
+  response->sensor_reading->humidity =
+      blobmsg_get_double(dht_table[ESP_RESPONSE_SENSOR_HUMIDITY]);
+}
+
+void ubus_parse_commesp_action_response(struct ubus_request *req, int type, struct blob_attr *msg) {
 	struct EspResponse *esp_response = (struct EspResponse *) req->priv;
 	struct blob_attr *esp_response_table[__ESP_RESPONSE_MAX];
 
@@ -94,35 +119,13 @@ void ubus_parse_commesp_esp_action_response(struct ubus_request *req, int type, 
 		strcpy(esp_response->message, message);
 	}
 
-	// TODO move out into function.
-  struct blob_attr *dht_table[__ESP_RESPONSE_SENSOR_MAX];
-
   switch (esp_response->tag) {
   case ESP_ACTION_TOGGLE_PIN:
     // Toggle pin must not return any data - if it does - something's wrong.
     assert(esp_response_table[ESP_RESPONSE_DATA] == NULL);
     break;
   case ESP_ACTION_READ_SENSOR:
-    if (esp_response_table[ESP_RESPONSE_DATA] == NULL) {
-      // TODO: MAKE ESPCOMMD RETURN ERR ON "DHT RETURNED NO DATA" INSTEAD OF OK.
-      // if (esp_response->success == true) {
-      //   esp_response->parsed_successfuly = false;
-      // }
-      break;
-    }
-    blobmsg_parse(esp_action_response_sensor_data_policy,
-                  __ESP_RESPONSE_SENSOR_MAX, dht_table,
-                  blobmsg_data(esp_response_table[ESP_RESPONSE_DATA]),
-                  blobmsg_data_len(esp_response_table[ESP_RESPONSE_DATA]));
-    if (dht_table[ESP_RESPONSE_SENSOR_TEMPERATURE] != NULL &&
-        dht_table[ESP_RESPONSE_SENSOR_HUMIDITY] != NULL) {
-      esp_response->sensor_reading->temperature =
-          blobmsg_get_double(dht_table[ESP_RESPONSE_SENSOR_TEMPERATURE]);
-      esp_response->sensor_reading->humidity =
-          blobmsg_get_double(dht_table[ESP_RESPONSE_SENSOR_HUMIDITY]);
-    } else {
-      esp_response->parsed_successfuly = false;
-    }
+  	parse_commesp_read_sensor_response_sensor_data(esp_response, esp_response_table);
     break;
   }
 }
@@ -131,12 +134,12 @@ void ubus_parse_commesp_devices(struct ubus_request *req, int type, struct blob_
 	struct EspDevices *device_list = (struct EspDevices *) req->priv;
 
 	struct blob_attr *tb[__COMMESP_MAX];
-	blobmsg_parse(commesp_policy, __COMMESP_MAX, tb, blobmsg_data(msg), blobmsg_data_len(msg));
-	if (tb[COMMESP_DEVICES] == NULL) {
+	blobmsg_parse(esp_devices_policy, __COMMESP_MAX, tb, blobmsg_data(msg), blobmsg_data_len(msg));
+	if (tb[ESP_DEVICES] == NULL) {
 		goto failure;
 	}
 
-	struct blob_attr *devices = tb[COMMESP_DEVICES];
+	struct blob_attr *devices = tb[ESP_DEVICES];
 	struct blob_attr *device;
 	size_t rem;
 
@@ -151,21 +154,21 @@ void ubus_parse_commesp_devices(struct ubus_request *req, int type, struct blob_
 	int i = 0;
 	blobmsg_for_each_attr(device, devices, rem) {
 		struct blob_attr *device_properties[__COMMESP_DEVICE_MAX];
-		blobmsg_parse(commesp_device_properties_policy, __COMMESP_DEVICE_MAX, device_properties,
+		blobmsg_parse(esp_device_properties_policy, __COMMESP_DEVICE_MAX, device_properties,
 		              blobmsg_data(device), blobmsg_data_len(device));
-		if (device_properties[COMMESP_DEVICE_PORT] == NULL ||
-		    device_properties[COMMESP_DEVICE_VID] == NULL ||
-		    device_properties[COMMESP_DEVICE_PID] == NULL) {
+		if (device_properties[ESP_DEVICE_PORT] == NULL ||
+		    device_properties[ESP_DEVICE_VID] == NULL ||
+		    device_properties[ESP_DEVICE_PID] == NULL) {
 			goto failure;
 		}
 
-		char *port = blobmsg_get_string(device_properties[COMMESP_DEVICE_PORT]);
+		char *port = blobmsg_get_string(device_properties[ESP_DEVICE_PORT]);
 		device_list->devices[i].port = calloc(strlen(port) + 1, sizeof(char));
 		strcpy(device_list->devices[i].port, port);
-		char *vid = blobmsg_get_string(device_properties[COMMESP_DEVICE_VID]);
+		char *vid = blobmsg_get_string(device_properties[ESP_DEVICE_VID]);
 		device_list->devices[i].vid = calloc(strlen(vid) + 1, sizeof(char));
 		strcpy(device_list->devices[i].vid, vid);
-		char *pid = blobmsg_get_string(device_properties[COMMESP_DEVICE_PID]);
+		char *pid = blobmsg_get_string(device_properties[ESP_DEVICE_PID]);
 		device_list->devices[i].pid = calloc(strlen(pid) + 1, sizeof(char));
 		strcpy(device_list->devices[i].pid, pid);
 		i++;

@@ -1,4 +1,5 @@
 #include "tuya.h"
+#include "tuya_error.h"
 #include "tuya_action_esp.h"
 #include "tuya_action_log.h"
 #include "tuya_action_system.h"
@@ -18,9 +19,6 @@
 #include "log_level.h"
 
 #define TUYA_ACTION_FILE_PATH "/tmp/tuya_action.log"
-
-// TODO: Replace by tuya_error.c/h
-#define PARSE_TUYA_ACTION_ERROR_FORMAT "{\"result\":\"err\",\"message\":\"%s\"}"
 
 extern struct ubus_context *g_ubus_context;
 tuya_mqtt_context_t g_tuya_context;
@@ -52,19 +50,20 @@ static bool ParseTuyaActionResult_to_tuya_response_json_string(
     return true;
   }
 
-  *response_json_string = calloc(1024, sizeof(char));
-  char format_buf[1024];
+  char format_buf[256];
   switch (action_result) {
   case PARSE_TUYA_ACTION_RESULT_ERR_MALFORMED_JSON:
-    snprintf(*response_json_string, 1024, PARSE_TUYA_ACTION_ERROR_FORMAT,
-             ParseTuyaActionResult_message
-                 [PARSE_TUYA_ACTION_RESULT_ERR_MALFORMED_JSON]);
+    *response_json_string = create_tuya_response_json(
+        ParseTuyaActionResult_message
+            [PARSE_TUYA_ACTION_RESULT_ERR_MALFORMED_JSON],
+        false);
     return false;
   case PARSE_TUYA_ACTION_RESULT_ERR_METHOD_DOES_NOT_EXIST:
-    snprintf(format_buf, 1024, PARSE_TUYA_ACTION_ERROR_FORMAT,
+    snprintf(format_buf, sizeof(format_buf),
              ParseTuyaActionResult_message
-                 [PARSE_TUYA_ACTION_RESULT_ERR_METHOD_DOES_NOT_EXIST]);
-    snprintf(*response_json_string, 1024, format_buf, result.field);
+                 [PARSE_TUYA_ACTION_RESULT_ERR_METHOD_DOES_NOT_EXIST],
+             result.field);
+    *response_json_string = create_tuya_response_json(format_buf, false);
     return false;
   default:
     assert(false); // should never happen.

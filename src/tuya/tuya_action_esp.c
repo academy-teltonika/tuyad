@@ -7,8 +7,9 @@
 
 #include <assert.h>
 
-static bool parse_esp_request_from_tuya_action_json(cJSON *action_json,
-                                             struct EspRequest *esp_request) {
+static bool
+parse_esp_request_from_tuya_action_json(cJSON *action_json,
+                                        struct EspRequest *esp_request) {
   cJSON *input_params_json = cJSON_GetObjectItem(action_json, "inputParams");
   if (input_params_json == NULL) {
     return false;
@@ -82,6 +83,9 @@ static char *EspResponse_to_json_string(struct EspResponse response) {
   switch (response.tag) {
   case ESP_ACTION_READ_SENSOR: {
     struct DHTSensorReading *reading = response.sensor_reading;
+    if (reading == NULL) {
+    	break;
+    }
     snprintf(field_buffer, sizeof(field_buffer), "%f", reading->temperature);
     if (cJSON_AddStringToObject(packet, "temperature", field_buffer) == NULL)
       goto end;
@@ -170,7 +174,6 @@ void execute_commesp_esp_pin_action(enum EspAction action,
 		result = ubus_invoke_esp_toggle_pin(&esp_request, &esp_response);
     break;
   case ESP_ACTION_READ_SENSOR:
-  	esp_response.sensor_reading = malloc(sizeof(struct DHTSensorReading));
 		result = ubus_invoke_esp_read_sensor(&esp_request, &esp_response);
 		break;
   default:
