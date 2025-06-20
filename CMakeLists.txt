@@ -40,4 +40,4 @@ target_link_options(tuyad PRIVATE
     $<$<CONFIG:DEBUG>: -fsanitize=address >
 )
 
-install(TARGETS tuyad RUNTIME DESTINATION bin)
+install(TARGETS tuyad DESTINATION bin)
