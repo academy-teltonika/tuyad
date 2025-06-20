@@ -8,15 +8,15 @@
 #include <sys/stat.h>
 #include <syslog.h>
 #include <time.h>
-#include <tuya_error_code.h> // TODO
-#include <tuyalink_core.h>   // TODO
+#include <tuya_error_code.h>
+#include <tuyalink_core.h>
 #include <unistd.h>
 
 #define SYSLOG_OPTIONS LOG_PID | LOG_NDELAY
 #define CLOUD_REPORTING_INTERVAL_SEC 5
 
 void configure_signal_handlers(void);
-void termination_handler(int signum);
+void termination_signal_handler(int signum);
 void cleanup(void);
 
 extern struct ubus_context *g_ubus_context;
@@ -53,17 +53,15 @@ int main(int argc, char **argv) {
 }
 
 void cleanup(void) {
-  closelog();
-  // tuya_mqtt_disconnect(&g_tuya_context); // Possibly redundant. Need to read
-  // the documentation.
   tuya_mqtt_deinit(&g_tuya_context);
   ubus_deinit();
   syslog(LOG_LEVEL_INFO, "Shutdown successful.");
+  closelog();
 }
 
 void configure_signal_handlers(void) {
   struct sigaction action;
-  action.sa_handler = termination_handler;
+  action.sa_handler = termination_signal_handler;
   sigemptyset(&action.sa_mask);
   action.sa_flags = 0;
 
@@ -73,7 +71,7 @@ void configure_signal_handlers(void) {
   sigaction(SIGHUP, &action, NULL);
 }
 
-void termination_handler(int signum) {
+void termination_signal_handler(int signum) {
   g_running = false;
   syslog(LOG_LEVEL_INFO, "Terminating from signal: %d", signum);
 }

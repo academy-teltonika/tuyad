@@ -37,19 +37,18 @@ end:
 }
 
 static char *create_ubus_error_json(enum UbusSystemActionResult result) {
-  char* ptr;
   switch (result) {
   case UBUS_SYSTEM_ACTION_RESULT_OK:
   	assert(false); // You passed an OK as an error.
   case UBUS_SYSTEM_ACTION_RESULT_ERR_SYSTEM_NOT_FOUND:
-    ptr = create_tuya_response_json(UbusSystemActionResult_messages[UBUS_SYSTEM_ACTION_RESULT_ERR_SYSTEM_NOT_FOUND], false);
-    return ptr;
+    return create_tuya_response_json(UbusSystemActionResult_messages[UBUS_SYSTEM_ACTION_RESULT_ERR_SYSTEM_NOT_FOUND], false);
   case UBUS_SYSTEM_ACTION_RESULT_ERR_ACTION_FAILED:
     return create_tuya_response_json(UbusSystemActionResult_messages[UBUS_SYSTEM_ACTION_RESULT_ERR_ACTION_FAILED], false);
   case UBUS_SYSTEM_ACTION_RESULT_ERR_PARSE_FAILED:
     return create_tuya_response_json(UbusSystemActionResult_messages[UBUS_SYSTEM_ACTION_RESULT_ERR_PARSE_FAILED], false);
+  default:
+    assert(false);
   }
-  assert(false); // Never happens, but compiler complains without it.
 }
 
 void execute_system_get_info(char **response_json) {
@@ -61,6 +60,5 @@ void execute_system_get_info(char **response_json) {
     } else {
         *response_json = create_sysinfo_json(&systemInfo);
     }
-
 }
 

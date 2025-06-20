@@ -2,11 +2,11 @@
 
 const char doc[] = "Tuya cloud communication daemon.";
 const char args_doc[] = "-p <PROCUCT-ID> -d <DEVICE-ID> -s <DEVICE-SECRET>";
-struct argp_option options[] = {
+const struct argp_option options[] = {
     {"verbose", 'p', "product-id", 0, "Tuya cloud product id."},
     {"verbose", 'd', "device-id", 0, "Tuya cloud device id."},
     {"verbose", 's', "device-secret", 0, "Tuya cloud device secret."},
-    {0}
+    {}
 };
 
 error_t

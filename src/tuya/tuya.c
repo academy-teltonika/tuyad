@@ -3,9 +3,7 @@
 #include "tuya_action_esp.h"
 #include "tuya_action_log.h"
 #include "tuya_action_system.h"
-
 #include "arguments.h"
-
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -14,7 +12,6 @@
 #include <log.h>
 #include <stdlib.h>
 #include <tuya_error_code.h>
-
 #include <syslog.h>
 #include "log_level.h"
 
@@ -39,8 +36,8 @@ static const char *ParseTuyaActionResult_message[] = {
     [PARSE_TUYA_ACTION_RESULT_ERR_MALFORMED_JSON] = "Action JSON is malformed.",
     [PARSE_TUYA_ACTION_RESULT_ERR_METHOD_DOES_NOT_EXIST] = "Method \\\"%s\\\" does not exist."};
 
-// If result is error, response_json_string is error message,
-// otherwise, if result is success, response_json_string will be NULL.
+// If result is an error, response_json_string will be the error message,
+// otherwise, if result is an ok, response_json_string will be NULL.
 static bool ParseTuyaActionResult_to_tuya_response_json_string(
     struct ParseTuyaActionResult result, char **response_json_string) {
 
@@ -145,7 +142,9 @@ static void execute_tuya_action(struct tuya_mqtt_context *context,
   }
 
 end:
-  printf("RESP: %s\n", response_json_string);
+  if (response_json_string == NULL) {
+    response_json_string = create_tuya_response_json("Failed to construct tuya response.", false);
+  }
   tuyalink_thing_property_report(&g_tuya_context, NULL, response_json_string);
   cJSON_Delete(action_json);
   free(response_json_string);

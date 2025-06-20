@@ -59,7 +59,6 @@ parse_esp_request_from_tuya_action_json(cJSON *action_json,
   return true;
 }
 
-// TODO: this can potentialy fail - add error handling.
 static char *EspResponse_to_json_string(struct EspResponse response) {
   char *json_string = NULL;
   char field_buffer[1024];
@@ -156,17 +155,21 @@ static char *create_ubus_error_json(enum UbusCommespActionResult result) {
     return create_tuya_response_json(UbusCommespActionResult_messages [UBUS_COMMESP_ACTION_RESULT_ERR_COMMESPD_ACTION_FAILED], false);
   case UBUS_COMMESP_ACTION_RESULT_ERR_PARSE_FAILED:
     return create_tuya_response_json(UbusCommespActionResult_messages [UBUS_COMMESP_ACTION_RESULT_ERR_PARSE_FAILED], false);
+  default:
+    assert(false); // Never happens, but compiler complains without it.
   }
-  assert(false); // Never happens, but compiler complains without it.
 }
 
 void execute_commesp_esp_pin_action(enum EspAction action,
                                     cJSON *tuya_action_json,
                                     char **esp_action_response_json_string) {
-	enum UbusCommespActionResult result = UBUS_COMMESP_ACTION_RESULT_OK;
+  enum UbusCommespActionResult result = UBUS_COMMESP_ACTION_RESULT_OK;
   struct EspRequest esp_request = EspRequest_new(action);
-  parse_esp_request_from_tuya_action_json(tuya_action_json,
-                                          &esp_request); // TODO parse checking
+  if (!parse_esp_request_from_tuya_action_json(tuya_action_json, &esp_request)) {
+    *esp_action_response_json_string =
+        create_tuya_response_json("JSON parsing error.", false);
+      goto end;
+  }
   struct EspResponse esp_response = EspResponse_new(action);
 
   switch (action) {
@@ -186,8 +189,9 @@ void execute_commesp_esp_pin_action(enum EspAction action,
   	*esp_action_response_json_string = EspResponse_to_json_string(esp_response);
   }
 
-	EspRequest_free(&esp_request);
-	EspResponse_free(&esp_response);
+end:
+  EspRequest_free(&esp_request);
+  EspResponse_free(&esp_response);
 }
 
 void execute_commesp_list_devices(char **commesp_resposne_json) {

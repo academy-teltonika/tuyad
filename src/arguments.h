@@ -5,7 +5,7 @@
 
 extern const char doc[];
 extern const char args_doc[];
-extern struct argp_option options[];
+extern const struct argp_option options[];
 
 struct arguments {
   char *product_id;

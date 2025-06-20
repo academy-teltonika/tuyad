@@ -67,7 +67,6 @@ static char *create_file_error_json(enum FileOperationResult result) {
 
 void execute_log_to_file(cJSON *action_json, char **response) {
     char* message = parse_log_message_json(action_json);    
-    // TODO: Error handling.
     enum FileOperationResult result = append_message_to_file("/tmp/tuya_messages", message);
     if (result != FILE_OPERATION_RESULT_OK) {
         *response = create_file_error_json(result);
