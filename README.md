@@ -2,13 +2,13 @@
 
 ## Quick-start guide
 
-1. Install ubus and espcommd.
+1. Install ubus and espcommd
 2. Install this application using "cmake . && make"
-2. Start ubusd and run espcommd. 
+2. Start ubusd and run espcommd 
 3. Start this application with the correct tuya credentials (-p <PRODUCT_ID> -d <DEVICE_ID> -s <DEVICE_SECRET)
 4. Send commands using Tuya actions and observe the results
 
-## Tuya action codes
+## Tuya action specification
 
 list_devices
 
@@ -32,9 +32,6 @@ read_sensor (required arguments):
 4. model: string
 
 ## TODO
-
 - [ ] Implement graceful ubus failure handling. Possible to restart?
-- [ ] Create OpenWRT packages and install the application into the router.
-- [x] Restore "write to log" Tuya action functionality.
-- [x] Finish implementing the Tuya action for reading sensor data.
 - [ ] Fix "DHT returned no data" being OK (should be Err).
+- [ ] Fix empty return result when passing invalid sensor type to esp (bug in esp firmware).
