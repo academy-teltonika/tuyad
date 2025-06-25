@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
   openlog(NULL, SYSLOG_OPTIONS, LOG_LOCAL0);
 
   if (!ubus_init()) {
-    syslog(LOG_LEVEL_ERROR, "Failed to connect to ubus\n");
+    syslog(LOG_LEVEL_ERROR, "Failed to connect to ubus.");
     return -1;
   }
 
@@ -73,5 +73,5 @@ void configure_signal_handlers(void) {
 
 void termination_signal_handler(int signum) {
   g_running = false;
-  syslog(LOG_LEVEL_INFO, "Terminating from signal: %d", signum);
+  syslog(LOG_LEVEL_INFO, "Terminating from signal: %d.", signum);
 }
