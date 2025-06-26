@@ -32,6 +32,7 @@ read_sensor (required arguments):
 4. model: string
 
 ## TODO
+- [ ] Decouple parsing from action execution (refactor).
 - [ ] Implement graceful ubus failure handling. Possible to restart?
 - [ ] Fix "DHT returned no data" being OK (should be Err).
 - [ ] Fix empty return result when passing invalid sensor type to esp (bug in esp firmware).
