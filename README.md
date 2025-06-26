@@ -1,4 +1,4 @@
-# OpenWRT Tuya cloud communication and esp controller daemon [WIP]
+# OpenWRT Tuya cloud communication and esp controller daemon
 
 ## Quick-start guide
 
@@ -32,6 +32,7 @@ read_sensor (required arguments):
 4. model: string
 
 ## TODO
+- [ ] Simplify error handling code.
 - [ ] Decouple parsing from action execution (refactor).
 - [ ] Implement graceful ubus failure handling. Possible to restart?
 - [ ] Fix "DHT returned no data" being OK (should be Err).
